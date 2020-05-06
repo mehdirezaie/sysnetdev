@@ -24,6 +24,7 @@ class DNN(nn.Module):
     output = a(input)
     '''
     def __init__(self, nb_layers, nb_units, input_dim, output_dim):
+        assert nb_layers >= 2
         super(DNN, self).__init__()
         self.fc = nn.ModuleList()#[]
         self.bn = nn.ModuleList()#[]

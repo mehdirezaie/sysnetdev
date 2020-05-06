@@ -1,14 +1,14 @@
-''' Train DL models
-
-'''
-
 import copy
 import torch
 import os
-
+import numpy as np
+from torch.optim import AdamW
 from .callbacks import EarlyStopping
+__all__ = ['train_val', 'evaluate', 'tune_L1', 'tune_model_structure']
 
-__all__ = ['train_val', 'evaluate']
+''' Train DL models
+
+'''
 
 
 def add_regularization(model, loss, L1norm=True, L2norm=True,
@@ -30,6 +30,82 @@ def add_regularization(model, loss, L1norm=True, L2norm=True,
     return loss
 
 
+def weight_reset(m):
+    if isinstance(m, torch.nn.BatchNorm1d) or isinstance(m, torch.nn.Linear):
+        m.reset_parameters()
+
+def tune_L1(model,
+            dataloaders,
+            datasets_len,
+            criterion,
+            optimizer,
+            nepochs,
+            device):
+
+    assert nepochs < 10, 'max nepochs for hyper parameter tunning: 10'
+    l1_lambdas = np.logspace(-6, 0, 10)
+    history = {
+                'l1_lambdas':l1_lambdas,
+                'best_val_losses':[]
+                }
+    for l1_lambda in l1_lambdas:
+        # reset model weights
+        model.apply(weight_reset)
+        # call train_val ?
+        _, _, best_val_loss = train_val(
+                                    model=model,
+                                    dataloaders=dataloaders,
+                                    datasets_len=datasets_len,
+                                    criterion=criterion,
+                                    optimizer=optimizer,
+                                    nepochs=nepochs,
+                                    device=device,
+                                    L1lambda=l1_lambda,
+                                    L1norm=True
+                                    )
+
+        history['best_val_losses'].append(best_val_loss)
+
+    best_l1lambda = history['l1_lambdas'][np.argmin(history['best_val_losses'])]
+    return best_l1lambda
+
+
+def tune_model_structure(DNN,
+                        dataloaders,
+                        datasets_len,
+                        criterion,
+                        nepochs,
+                        device,
+                        structures,
+                        adamw_kw):
+    history = {
+                'structures' : structures,
+                'best_val_losses':[]
+                }
+    for structure in structures:
+        print(f'model with {structure}')
+
+        # reset model weights
+        model = DNN(*structure) # e.g., (3, 20, 18, 1)
+
+        optimizer = AdamW(params=model.parameters(), **adamw_kw)
+
+        # call train_val ?
+        _, _, best_val_loss = train_val(
+                                    model=model,
+                                    dataloaders=dataloaders,
+                                    datasets_len=datasets_len,
+                                    criterion=criterion,
+                                    optimizer=optimizer,
+                                    nepochs=nepochs,
+                                    device=device
+                                    )
+
+        history['best_val_losses'].append(best_val_loss)
+
+    best_structure = history['structures'][np.argmin(history['best_val_losses'])]
+    return best_structure
+
 
 def train_val(model,
               dataloaders,
@@ -37,12 +113,12 @@ def train_val(model,
               criterion,
               optimizer,
               nepochs,
-              output_path,
               device,
-              scheduler,
+              output_path=None,
+              scheduler=None,
               L1lambda=1.0e-3,
               L2lambda=1.0e-6,
-              L1norm=True,
+              L1norm=False,
               L2norm=False):
     '''
     Function trains the DL model, `model`
@@ -67,14 +143,15 @@ def train_val(model,
     valid_losses: list,
     '''
     model = model.to(device)
-    output_dir = os.path.dirname(output_path)   # check output dir
-    if not os.path.exists(output_dir):
-        raise RuntimeError(f'{output_dir} does not exist')
+    if output_path is not None:
+        output_dir = os.path.dirname(output_path)   # check output dir
+        if not os.path.exists(output_dir):
+            raise RuntimeError(f'{output_dir} does not exist')
 
     train_losses = [] # placeholders for losses
     valid_losses = []
-
-    best_model_wts = copy.deepcopy(model.state_dict()) # `best` model
+    if output_path is not None:
+        best_model_wts = copy.deepcopy(model.state_dict()) # `best` model
     best_val_loss = 1.0e6 # a very large number
 
     #--- callbacks ---
@@ -95,8 +172,9 @@ def train_val(model,
                 for (data, target) in dataloaders[phase]: # training update
                     data = data.to(device)
                     target = target.to(device)
-                    scheduler.step(epoch+i/num_iter)
-                    i+=1
+                    if scheduler is not None:
+                        scheduler.step(epoch+i/num_iter)
+                        i+=1
                     optimizer.zero_grad()
 
                     # only on training phase
@@ -134,9 +212,13 @@ def train_val(model,
                     print(f'{phase} loss: {loss_valid_epoch:.3f}', end=' ')
                     if (loss_valid_epoch < best_val_loss):
                         best_val_loss = loss_valid_epoch
-                        best_model_wts = copy.deepcopy(model.state_dict())
+                        if output_path is not None:
+                            best_model_wts = copy.deepcopy(model.state_dict())
 
-        print(f'lr: {scheduler.get_lr()[0]:.6f}')
+        if scheduler is not None:
+            print(f'lr: {scheduler.get_lr()[0]:.6f}')
+        else:
+            print('')
 
         # Early stopping
         early_stopping(loss_valid_epoch)
@@ -144,10 +226,10 @@ def train_val(model,
             print(f'!--- Early stopping at {epoch:02d}/{nepochs-1:2d} ---!')
             break
 
-    torch.save(best_model_wts, output_path)
-    print(f'save model at {output_path}')
-    return train_losses, valid_losses
-
+    if output_path is not None:
+        torch.save(best_model_wts, output_path)
+        print(f'save model at {output_path}')
+    return train_losses, valid_losses, best_val_loss
 
 
 def evaluate(model,

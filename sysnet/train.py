@@ -42,13 +42,14 @@ def tune_L1(model,
             nepochs,
             device):
 
-    assert nepochs < 10, 'max nepochs for hyper parameter tunning: 10'
+    assert nepochs < 15, 'max nepochs for hyper parameter tunning: 10'
     l1_lambdas = np.logspace(-6, 0, 10)
     history = {
                 'l1_lambdas':l1_lambdas,
                 'best_val_losses':[]
                 }
     for l1_lambda in l1_lambdas:
+        print(f'l1_lambda: {l1_lambda}')
         # reset model weights
         model.apply(weight_reset)
         # call train_val ?

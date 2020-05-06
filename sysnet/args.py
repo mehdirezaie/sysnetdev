@@ -29,4 +29,14 @@ def parse_cmd_arguments(parser):
                         action='store_true',
                         help='find the best learning rate')
 
+    parser.add_argument('--find_structure',
+                        default=False,
+                        action='store_true',
+                        help='find the best nn structure')
+
+    parser.add_argument('--find_l1',
+                        default=False,
+                        action='store_true',
+                        help='find the best L1 lambda')
+
     return parser.parse_args()

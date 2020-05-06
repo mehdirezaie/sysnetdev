@@ -31,10 +31,9 @@ for (key, value) in ns.__dict__.items():
 '''
 dataloaders, datasets_len, stats = load_data(ns.input_path, ns.batch_size)
 
-
-''' LEARNING RATE
-'''
 if ns.find_lr:
+    ''' LEARNING RATE
+    '''
     # --- find learning rate
     fig, ax = plt.subplots()
     model = DNN(3, 20, 18, 1)
@@ -51,60 +50,54 @@ if ns.find_lr:
     lr_finder.reset()
     fig.savefig(ns.output_path.replace('.pt', '_lr.png'), bbox_inches='tight')
     sys.exit()
+else:
+    lr_best = 1.0e-3 # manually set
+print(f'lr_best: {lr_best}')
 
-lr_best = 1.0e-3 # manually set
-
-
-
-''' NN structure tunning
-'''
 adamw_kw = dict(lr=lr_best,
                 betas=(0.9, 0.999),
                 eps=1e-08,
                 weight_decay=0.01,
                 amsgrad=False)
 
+if ns.find_structure:
+    ''' NN structure tunning
+    '''
+    print('NN structure is being tunned')
+    structures = [(3, 20, 18, 1), (4, 20, 18, 1), (5, 20, 18, 1)]
+    criterion = MSELoss() # reduction='mean'
+    best_structure = tune_model_structure(DNN,
+                                          dataloaders,
+                                          datasets_len,
+                                          criterion,
+                                          ns.nepochs,
+                                          device,
+                                          structures,
+                                          adamw_kw=adamw_kw)
 
-print('NN structure is being tunned')
-structures = [(3, 20, 18, 1), (4, 20, 18, 1), (5, 20, 18, 1)]
-criterion = MSELoss() # reduction='mean'
-best_structure = tune_model_structure(DNN,
-                                      dataloaders,
-                                      datasets_len,
-                                      criterion,
-                                      ns.nepochs,
-                                      device,
-                                      structures,
-                                      adamw_kw=adamw_kw)
+else:
+    best_structure = (5, 20, 18, 1)
 print(f'best_structure: {best_structure}')
+
+if ns.find_l1:
+    ''' L1 regularization finder
+    '''
+    print('L1 regularization scale is being tunned')
+    model = DNN(3, 20, 18, 1)
+    optimizer = AdamW(params=model.parameters(), **adamw_kw)
+    criterion = MSELoss() # reduction='mean'
+    l1_alpha = tune_L1(model,
+                        dataloaders,
+                        datasets_len,
+                        criterion,
+                        optimizer,
+                        ns.nepochs,
+                        device)
+else:
+    l1_alpha=1.0e-6
+print(f'l1_alpha: {best_structure}')
+
 sys.exit()
-
-
-
-
-
-
-
-''' L1 regularization finder
-'''
-print('L1 regularization scale is being tunned')
-model = DNN(3, 20, 18, 1)
-optimizer = AdamW(params=model.parameters(),
-                  lr=1.0e-7,
-                  betas=(0.9, 0.999),
-                  eps=1e-08,
-                  weight_decay=0.01,
-                  amsgrad=False)
-criterion = MSELoss() # reduction='mean'
-l1_alpha = tune_L1(model,
-                    dataloaders,
-                    datasets_len,
-                    criterion,
-                    optimizer,
-                    nepochs,
-                    device)
-
-
 
 
 

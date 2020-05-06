@@ -29,6 +29,8 @@ def add_regularization(model, loss, L1norm=True, L2norm=True,
 
     return loss
 
+
+
 def train_val(model,
               dataloaders,
               datasets_len,
@@ -64,6 +66,7 @@ def train_val(model,
     train_losses: list,
     valid_losses: list,
     '''
+    model = model.to(device)
     output_dir = os.path.dirname(output_path)   # check output dir
     if not os.path.exists(output_dir):
         raise RuntimeError(f'{output_dir} does not exist')
@@ -142,18 +145,23 @@ def train_val(model,
             break
 
     torch.save(best_model_wts, output_path)
+    print(f'save model at {output_path}')
     return train_losses, valid_losses
 
 
 
 def evaluate(model,
-              dataloaders,
-              datasets_len,
-              criterion,
-              phase='test'):
+            dataloaders,
+            datasets_len,
+            criterion,
+            device,
+            phase='test'):
+    model = model.to(device)
     with torch.no_grad():
         model.eval()
         loss = 0
         for data, target in dataloaders[phase]:
+            data = data.to(device)
+            target = target.to(device)
             loss += criterion(target, model(data)) * data.size(0)
     return (loss / datasets_len[phase]).item()

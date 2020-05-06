@@ -47,6 +47,9 @@ except ImportError:
 
 __all__ = ['LRFinder']
 
+
+
+
 class LRFinder(object):
     """Learning rate range test.
 
@@ -235,6 +238,8 @@ class LRFinder(object):
 
         print("Learning rate search finished. See the graph with {finder_name}.plot()")
 
+    def _get_best_lr(self):
+        pass 
     def _set_learning_rate(self, new_lrs):
         if not isinstance(new_lrs, list):
             new_lrs = [new_lrs] * len(self.optimizer.param_groups)

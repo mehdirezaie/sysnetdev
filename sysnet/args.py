@@ -24,4 +24,9 @@ def parse_cmd_arguments(parser):
                         default=11,
                         help='number of training epochs')
 
+    parser.add_argument('--find_lr',
+                        default=False,
+                        action='store_true',
+                        help='find the best learning rate')
+
     return parser.parse_args()

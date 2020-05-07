@@ -21,7 +21,7 @@ def parse_cmd_arguments(parser):
 
     parser.add_argument('--nepochs',
                         type=int,
-                        default=11,
+                        default=1,
                         help='number of training epochs')
 
     parser.add_argument('--find_lr',

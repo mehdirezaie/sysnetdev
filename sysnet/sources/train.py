@@ -42,7 +42,7 @@ def tune_L1(model,
             nepochs,
             device):
 
-    assert nepochs < 15, 'max nepochs for hyper parameter tunning: 10'
+    assert nepochs < 10, 'max nepochs for hyper parameter tunning: 10'
     l1_lambdas = np.logspace(-6, 0, 10)
     history = {
                 'l1_lambdas':l1_lambdas,
@@ -79,6 +79,7 @@ def tune_model_structure(DNN,
                         device,
                         structures,
                         adamw_kw):
+    assert nepochs < 10, 'max nepochs for hyper parameter tunning: 10'
     history = {
                 'structures' : structures,
                 'best_val_losses':[]

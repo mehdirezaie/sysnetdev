@@ -16,6 +16,12 @@ import sysnet.sources as src
 __all__ = ['SYSNet']
 
 class SYSNet:
+    '''
+        Implementation of a multilayer neural network for mitigation of
+        observational systematics
+
+        
+    '''
 
     def __init__(self, ns):
         self.t0 = time()

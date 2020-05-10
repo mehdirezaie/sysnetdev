@@ -39,4 +39,9 @@ def parse_cmd_arguments(parser):
                         action='store_true',
                         help='find the best L1 lambda')
 
+    parser.add_argument('--isKfold',
+                        default=False,
+                        action='store_true',
+                        help='enable k-fold cross validation (k=5)')
+
     return parser.parse_args()

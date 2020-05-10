@@ -229,6 +229,8 @@ def train_val(model,
             break
 
     if output_path is not None:
+        if os.path.exists(output_path):
+            raise RuntimeError(f'{output_path} already exists!')
         torch.save(best_model_wts, output_path)
         print(f'save model at {output_path}')
     return train_losses, valid_losses, best_val_loss

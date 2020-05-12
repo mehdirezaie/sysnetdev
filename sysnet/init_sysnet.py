@@ -20,8 +20,6 @@ class SYSNet:
     '''
         Implementation of a multilayer neural network for mitigation of
         observational systematics
-
-
     '''
 
     def __init__(self, ns):

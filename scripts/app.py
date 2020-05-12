@@ -19,6 +19,6 @@ for (key, value) in ns.__dict__.items():
 my_sysnet = sysnet.SYSNet(ns)
 my_sysnet.run(eta_min=1.0e-5,
               lr_best=1.0e-3,
-              best_structure=(3, 20, 18, 1),
-              l1_alpha=1.0e-6,
+              best_structure=(4, 20, 18, 1),
+              l1_alpha=1.0e-3,
               savefig=True)

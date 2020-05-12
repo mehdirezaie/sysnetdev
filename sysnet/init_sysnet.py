@@ -39,7 +39,7 @@ class SYSNet:
            eta_min=1.0e-5,
            lr_best=1.0e-3,
            best_structure=(3, 20, 18, 1),
-           l1_alpha=1.0e-6,
+           l1_alpha=1.0e-3,
            savefig=True):
 
         if self.ns.isKfold:
@@ -69,7 +69,7 @@ class SYSNet:
                                                 l1_alpha=l1_alpha,
                                                 savefig=savefig)
             self.metrics['partition_0'] = train_val_test_losses
-            
+
         with open(self.ns.output_path.replace('.pt', '_metrics.json'), 'w') as f:
             json.dump(self.metrics, f)
             #print(self.metrics)
@@ -78,7 +78,7 @@ class SYSNet:
             eta_min=1.0e-5,
             lr_best=1.0e-3,
             best_structure=(3, 20, 18, 1),
-            l1_alpha=1.0e-6,
+            l1_alpha=1.0e-3,
             savefig=True):
         self.__find_lr(eta_min, lr_best)
         self.__find_structure(best_structure)
@@ -127,7 +127,7 @@ class SYSNet:
                             weight_decay=0.01,
                             amsgrad=False)
 
-    def __find_structure(self, best_structure=(5, 20, 18, 1)):
+    def __find_structure(self, best_structure=(4, 20, 18, 1)):
 
         if self.ns.find_structure:
             ''' NN structure tunning
@@ -139,7 +139,7 @@ class SYSNet:
                                                           self.dataloaders,
                                                           self.datasets_len,
                                                           criterion,
-                                                          self.ns.nepochs,
+                                                          10, #self.ns.nepochs,
                                                           self.device,
                                                           structures,
                                                           adamw_kw=self.adamw_kw)
@@ -163,7 +163,7 @@ class SYSNet:
                                 self.datasets_len,
                                 criterion,
                                 optimizer,
-                                self.ns.nepochs,
+                                10, #self.ns.nepochs,
                                 self.device)
             print(f'find best L1 scale in {time()-self.t0:.3f} sec')
         else:
@@ -188,7 +188,9 @@ class SYSNet:
                                                                 nepochs=self.ns.nepochs,
                                                                 device=self.device,
                                                                 output_path=self.ns.output_path,
-                                                                scheduler=scheduler)
+                                                                scheduler=scheduler,
+                                                                L1lambda=self.l1_alpha,
+                                                                L1norm=True)
 
         print(f'finish training in {time()-self.t0:.3f} sec')
         # save train and validation losses

@@ -23,7 +23,8 @@ class LoadData:
         else:
             self.df_split = self.split(self.df)  # 5-fold
 
-    def load_data(self, batch_size=1024, partition_id=0):
+    def load_data(self, batch_size=1024,
+                  partition_id=0, normalization='z-score'):
         '''
         This function loads the data generators from a fits file.
 
@@ -51,16 +52,29 @@ class LoadData:
         else:
             train, valid, test = self.df_split
 
-        # Z-score normalization
-        stats = {
-                'x':(np.mean(train['features'], 0), np.std(train['features'], 0)),
-                'y':(np.mean(train['label'], 0), np.std(train['label'], 0))
-                }
+        if normalization == 'z-score':
+            # Z-score normalization
+            stats = {
+                    'x':(np.mean(train['features'], 0), np.std(train['features'], 0)),
+                    'y':(np.mean(train['label'], 0), np.std(train['label'], 0))
+                    }
+        elif normalization == 'minmax':
+            # min-max
+            stats = {
+                    'x':(np.min(train['features'], 0),
+                         np.max(train['features'], 0)-np.min(train['features'], 0)),
+                    'y':(np.min(train['label'], 0),
+                         np.max(train['label'], 0)-np.min(train['label'], 0)),
+                    }
+        else:
+            raise NotImplementedError(f'{normalization} not implemented')
+
 
         train = ImagingData(train, stats)
         valid = ImagingData(valid, stats)
         test = ImagingData(test, stats)
 
+        print(train.x, train.y)
         datasets_len = {
                         'train':train.x.shape[0],
                         'valid':valid.x.shape[0],

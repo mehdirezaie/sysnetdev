@@ -45,7 +45,8 @@ class SYSNet:
 
             for partition in range(5):
                 data_partition = self.ld.load_data(batch_size=self.ns.batch_size,
-                                                   partition_id=partition)
+                                                   partition_id=partition,
+                                                   normalization=self.ns.normalization)
                 self.dataloaders, self.datasets_len, self.stats = data_partition
 
                 self.ns.output_path = output_path_org.replace('.pt', '_%d.pt'%partition)
@@ -56,16 +57,19 @@ class SYSNet:
                                                     l1_alpha=l1_alpha,
                                                     savefig=savefig)
                 self.metrics[f'partition_{partition}'] = train_val_test_losses
-
             self.ns.output_path = output_path_org
+
         else:
-            data_partition = self.ld.load_data(batch_size=self.ns.batch_size)
+            data_partition = self.ld.load_data(batch_size=self.ns.batch_size,
+                                               normalization=self.ns.normalization)
+
             self.dataloaders, self.datasets_len, self.stats = data_partition
             train_val_test_losses = self.__run(eta_min=eta_min,
                                                 lr_best=lr_best,
                                                 best_structure=best_structure,
                                                 l1_alpha=l1_alpha,
                                                 savefig=savefig)
+                                                
             self.metrics['partition_0'] = train_val_test_losses
 
         with open(self.ns.output_path.replace('.pt', '_metrics.json'), 'w') as f:

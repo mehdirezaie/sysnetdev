@@ -5,3 +5,7 @@ __pycache__
 *.npz
 *.pt
 *.so
+*.pt
+*.npz
+*.png
+*ipynb_checkpoints

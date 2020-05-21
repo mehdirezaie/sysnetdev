@@ -42,7 +42,7 @@ def tune_L1(model,
             nepochs,
             device):
 
-    assert nepochs < 10, 'max nepochs for hyper parameter tunning: 10'
+    assert nepochs < 11, 'max nepochs for hyper parameter tunning: 10'
     l1_lambdas = np.logspace(-6, 0, 10)
     history = {
                 'l1_lambdas':l1_lambdas,
@@ -79,7 +79,7 @@ def tune_model_structure(DNN,
                         device,
                         structures,
                         adamw_kw):
-    assert nepochs < 10, 'max nepochs for hyper parameter tunning: 10'
+    assert nepochs < 11, 'max nepochs for hyper parameter tunning: 10'
     history = {
                 'structures' : structures,
                 'best_val_losses':[]
@@ -157,7 +157,7 @@ def train_val(model,
     best_val_loss = 1.0e6 # a very large number
 
     #--- callbacks ---
-    early_stopping = EarlyStopping(patience=10, verbose=True)
+    #early_stopping = EarlyStopping(patience=10, verbose=True)
 
     #--- training loop `nepochs` ---
     num_iter = len(dataloaders['train']) # number of training updates
@@ -183,14 +183,16 @@ def train_val(model,
                     with torch.set_grad_enabled(phase == 'train'):
                         outputs = model(data)
                         loss = criterion(outputs, target)
-                        loss = add_regularization(
-                                                  model,
-                                                  loss,
-                                                  L1norm=L1norm,
-                                                  L2norm=L2norm,
-                                                  L1lambda=L1lambda,
-                                                  L2lambda=L2lambda
-                                                  )
+
+                        if L1norm | L2norm:
+                            loss = add_regularization(
+                                                      model,
+                                                      loss,
+                                                      L1norm=L1norm,
+                                                      L2norm=L2norm,
+                                                      L1lambda=L1lambda,
+                                                      L2lambda=L2lambda
+                                                      )
 
                     loss.backward()
                     optimizer.step()
@@ -223,12 +225,14 @@ def train_val(model,
             print('')
 
         # Early stopping
-        early_stopping(loss_valid_epoch)
-        if early_stopping.early_stop:
-            print(f'!--- Early stopping at {epoch:02d}/{nepochs-1:2d} ---!')
-            break
+        # early_stopping(loss_valid_epoch)
+        # if early_stopping.early_stop:
+        #    print(f'!--- Early stopping at {epoch:02d}/{nepochs-1:2d} ---!')
+        #    break
 
     if output_path is not None:
+        if os.path.exists(output_path):
+            raise RuntimeError(f'{output_path} already exists!')
         torch.save(best_model_wts, output_path)
         print(f'save model at {output_path}')
     return train_losses, valid_losses, best_val_loss

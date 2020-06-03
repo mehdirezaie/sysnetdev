@@ -39,7 +39,7 @@ def parse_cmd_arguments(parser):
                         action='store_true',
                         help='find the best L1 lambda')
 
-    parser.add_argument('-k', '--isKfold',
+    parser.add_argument('-k', '--do_kfold',
                         default=False,
                         action='store_true',
                         help='enable k-fold cross validation (k=5)')
@@ -48,5 +48,16 @@ def parse_cmd_arguments(parser):
                         type=str,
                         default='z-score',
                         help='standardization method')
+    
+    parser.add_argument('-ax', '--axes',
+                        type=int,
+                        nargs='*',
+                        required=True,
+                        help='index of features to use')
+    
+    parser.add_argument('--do_rfe',
+                        default=False,
+                        action='store_true',
+                        help='perform recursive feature elimination')
 
     return parser.parse_args()

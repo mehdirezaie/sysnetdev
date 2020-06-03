@@ -28,10 +28,10 @@ class SYSNet:
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         print(f'device: {self.device}')
 
-        self.ld = src.LoadData(ns.input_path, isKfold=ns.isKfold)
+        self.ld = src.LoadData(ns.input_path, do_kfold=ns.do_kfold)
         print(f'data loaded in {time()-self.t0:.3f} sec')
         self.ns = ns
-        self.metrics = {}
+        self.metrics = {}        
 
     def run(self,
            eta_min=1.0e-5,
@@ -40,42 +40,81 @@ class SYSNet:
            l1_alpha=1.0e-3,
            savefig=True):
 
-        if self.ns.isKfold:
+        if self.ns.do_rfe:
+            self.axes_to_keep = self.rfe(self.ns.axes)
+        
+        if self.ns.do_kfold:
             output_path_org = self.ns.output_path
 
             for partition in range(5):
+                key = f'partition_{partition}'
+                
+
+                axes = self.axes_to_keep[key]['axes_to_keep'] if hasattr(self, 'axes_to_keep') else self.ns.axes
+                
+                structure = (best_structure[0], best_structure[1], len(axes), best_structure[3])
+                
                 data_partition = self.ld.load_data(batch_size=self.ns.batch_size,
                                                    partition_id=partition,
-                                                   normalization=self.ns.normalization)
+                                                   normalization=self.ns.normalization,
+                                                   axes=axes)
                 self.dataloaders, self.datasets_len, self.stats = data_partition
 
                 self.ns.output_path = output_path_org.replace('.pt', '_%d.pt'%partition)
 
                 train_val_test_losses = self.__run(eta_min=eta_min,
                                                     lr_best=lr_best,
-                                                    best_structure=best_structure,
+                                                    best_structure=structure,
                                                     l1_alpha=l1_alpha,
                                                     savefig=savefig)
-                self.metrics[f'partition_{partition}'] = train_val_test_losses
+                self.metrics[key] = train_val_test_losses
             self.ns.output_path = output_path_org
 
         else:
+            key = 'partition_0'
+            axes = self.axes_to_keep[key]['axes_to_keep'] if hasattr(self, 'axes_to_keep') else self.ns.axes                
+            structure = (best_structure[0], best_structure[1], len(axes), best_structure[3])
+            
             data_partition = self.ld.load_data(batch_size=self.ns.batch_size,
-                                               normalization=self.ns.normalization)
+                                               partition_id=0, # only one partition exists
+                                               normalization=self.ns.normalization,
+                                               axes=axes)
 
             self.dataloaders, self.datasets_len, self.stats = data_partition
             train_val_test_losses = self.__run(eta_min=eta_min,
                                                 lr_best=lr_best,
-                                                best_structure=best_structure,
+                                                best_structure=structure,
                                                 l1_alpha=l1_alpha,
                                                 savefig=savefig)
                                                 
-            self.metrics['partition_0'] = train_val_test_losses
+            self.metrics[key] = train_val_test_losses
 
         with open(self.ns.output_path.replace('.pt', '_metrics.json'), 'w') as f:
             json.dump(self.metrics, f)
             #print(self.metrics)
 
+    def rfe(self, axes):
+        axes_to_keep = {}
+        model = src.LinearRegression(add_bias=True)
+        if self.ns.do_kfold:
+            for partition in range(5):
+                datasets, sizes, stats = self.ld.load_data(batch_size=-1, 
+                                                           partition_id=partition)
+                fs = src.FeatureElimination(model, datasets)
+                fs.run(axes)
+                axes_to_keep[f'partition_{partition}'] = fs.results
+        else:
+            datasets, sizes, stats = self.ld.load_data(batch_size=-1)
+            fs = src.FeatureElimination(model, datasets)
+            fs.run(axes)  
+            axes_to_keep['partition_0'] = fs.results
+        
+        print(f'RFE done in {time()-self.t0:.3f} sec')
+        for key in axes_to_keep:
+            print(key, axes_to_keep[key]['axes_to_keep'])
+            
+        return axes_to_keep
+               
     def __run(self,
             eta_min=1.0e-5,
             lr_best=1.0e-3,
@@ -91,13 +130,14 @@ class SYSNet:
         return {**train_val_losses, **test_loss}
 
 
-    def __find_lr(self, eta_min=1.0e-5, lr_best=1.0e-3):
+    def __find_lr(self, eta_min=1.0e-5, lr_best=1.0e-3, seed=42):
 
         if self.ns.find_lr:
             ''' LEARNING RATE
             '''
             # --- find learning rate
             fig, ax = plt.subplots()
+            torch.manual_seed(seed=seed)
             model = src.DNN(3, 20, 18, 1)
             optimizer = AdamW(params=model.parameters(),
                               lr=1.0e-7,
@@ -152,11 +192,12 @@ class SYSNet:
             self.best_structure = best_structure
         print(f'best_structure: {self.best_structure}')
 
-    def __find_l1(self, l1_alpha=1.0e-6):
+    def __find_l1(self, l1_alpha=1.0e-6, seed=42):
         if self.ns.find_l1:
             ''' L1 regularization finder
             '''
             print('L1 regularization scale is being tunned')
+            torch.manual_seed(seed=seed)
             model = src.DNN(*self.best_structure)
             optimizer = AdamW(params=model.parameters(), **self.adamw_kw)
             criterion = MSELoss() # reduction='mean'
@@ -172,9 +213,10 @@ class SYSNet:
             self.l1_alpha = l1_alpha
         print(f'l1_alpha: {self.l1_alpha}')
 
-    def __train(self, savefig=True):
+    def __train(self, savefig=True, seed=42):
         ''' TRAINING
         '''
+        torch.manual_seed(seed=seed)
         model = src.DNN(*self.best_structure)
         optimizer = AdamW(params=model.parameters(), **self.adamw_kw)
         scheduler = CosineAnnealingWarmRestarts(optimizer,

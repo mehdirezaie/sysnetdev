@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import numpy as np
 
 import logging
 
@@ -80,26 +81,35 @@ class LinearRegression:
 
     logger = logging.getLogger('LinearRegression')
 
-    def __init__(self, reduction='sum'):
-        self.logger.info(f'reduction: {reduction}')
+    def __init__(self, reduction='mean', add_bias=False):
+        #self.logger.info(f'reduction: {reduction}')
         self.cost = torch.nn.MSELoss(reduction=reduction)
-
+        self.add_bias = add_bias
+        
     def fit(self, x, y):
         # check input
         if isinstance(x, np.ndarray):
             x = torch.from_numpy(x)
         if isinstance(y, np.ndarray):
             y = torch.from_numpy(y)
-
+        
+        if self.add_bias:
+            x = torch.cat((torch.ones(x.shape[0]).unsqueeze(1), x), 1)
+        
         # training
         xx = torch.matmul(x.T, x)
         xx_inv = torch.inverse(xx)
         self.coef_ = torch.matmul(xx_inv, torch.matmul(x.T, y))
 
         # cost
-        cost_ = self.cost(y, self.predict(x))
-        self.logger.info('training cost: {cost_:.3f}')
-        self.logger.info(f'coefs: {self.coef_} cost: {cost_:.3f}')
+        cost_ = self.evaluate(x, y, has_bias=True)
+        #self.logger.info(f'training cost: {cost_:.3f}')
+        #self.logger.info(f'coefs: {self.coef_} cost: {cost_:.3f}')
 
-    def predict(self, x):
-        return torch.matmul(self.coef_, x.T)
+    def evaluate(self, x, y, has_bias=False):
+        return self.cost(y, self.predict(x, has_bias)).item()
+        
+    def predict(self, x, has_bias=False):
+        if (not has_bias) & self.add_bias:
+            x = torch.cat((torch.ones(x.shape[0]).unsqueeze(1), x), 1)        
+        return torch.matmul(x, self.coef_)

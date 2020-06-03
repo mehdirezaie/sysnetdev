@@ -78,7 +78,8 @@ def tune_model_structure(DNN,
                         nepochs,
                         device,
                         structures,
-                        adamw_kw):
+                        adamw_kw,
+                        seed=42):
     assert nepochs < 11, 'max nepochs for hyper parameter tunning: 10'
     history = {
                 'structures' : structures,
@@ -88,6 +89,7 @@ def tune_model_structure(DNN,
         print(f'model with {structure}')
 
         # reset model weights
+        torch.manual_seed(seed=seed)
         model = DNN(*structure) # e.g., (3, 20, 18, 1)
 
         optimizer = AdamW(params=model.parameters(), **adamw_kw)

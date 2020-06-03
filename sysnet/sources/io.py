@@ -12,19 +12,20 @@ __all__ = ['LoadData']
 
 class LoadData:
 
-    def __init__(self, fits_file, isKfold=False, random_seed=42):
+    def __init__(self, fits_file, do_kfold=False, random_seed=42):
         self.random_seed = random_seed
-        self.isKfold = isKfold
+        self.do_kfold = do_kfold
         self.df = ft.read(fits_file) # ('label', 'hpind', 'features', 'fracgood')
 
-        if self.isKfold:
+        if self.do_kfold:
             self.df_kfold = self.split2Kfolds(self.df, k=5, shuffle=True,
-                                    random_seed=random_seed)
+                                              random_seed=random_seed)
         else:
             self.df_split = self.split(self.df)  # 5-fold
 
     def load_data(self, batch_size=1024,
-                  partition_id=0, normalization='z-score'):
+                  partition_id=0, normalization='z-score',
+                  add_bias=False, axes=None):
         '''
         This function loads the data generators from a fits file.
 
@@ -46,12 +47,12 @@ class LoadData:
 
         #df = ft.read(fits_file)   # ('label', 'hpind', 'features', 'fracgood')
 
-        if self.isKfold:
+        if self.do_kfold:
             assert -1 < partition_id < 5
             train, valid, test = self.df_kfold[partition_id]
         else:
             train, valid, test = self.df_split
-
+        
         if normalization == 'z-score':
             # Z-score normalization
             stats = {
@@ -70,11 +71,10 @@ class LoadData:
             raise NotImplementedError(f'{normalization} not implemented')
 
 
-        train = ImagingData(train, stats)
-        valid = ImagingData(valid, stats)
-        test = ImagingData(test, stats)
+        train = ImagingData(train, stats, add_bias=add_bias, axes=axes)
+        valid = ImagingData(valid, stats, add_bias=add_bias, axes=axes)
+        test = ImagingData(test, stats, add_bias=add_bias, axes=axes)
 
-        print(train.x, train.y)
         datasets_len = {
                         'train':train.x.shape[0],
                         'valid':valid.x.shape[0],
@@ -86,14 +86,18 @@ class LoadData:
                     'valid':MyDataSet(valid.x, valid.y),
                     'test':MyDataSet(test.x, test.y),
                     }
-
-        dataloaders = {
-                        x:DataLoader(datasets[x],
-                                    batch_size=batch_size,
-                                    shuffle=True)
-                                    for x in ['train', 'valid', 'test']
-                      }
-        return dataloaders, datasets_len, stats
+        
+        if batch_size == -1:
+            return datasets, datasets_len, stats
+        else:            
+            dataloaders = {
+                            s:DataLoader(datasets[s],
+                                        batch_size=batch_size,
+                                        shuffle=True)
+                                        for s in ['train', 'valid', 'test']
+                          }
+            return dataloaders, datasets_len, stats
+        
 
     def split2Kfolds(self, data, k=5, shuffle=True, random_seed=42):
         '''
@@ -139,7 +143,7 @@ class LoadData:
 
 class ImagingData(object):
 
-    def __init__(self, dt, stats=None):
+    def __init__(self, dt, stats=None, add_bias=False, axes=None):
         self.x = dt['features']
         self.y = dt['label']
         self.p = dt['hpind'].astype('int64')
@@ -148,7 +152,13 @@ class ImagingData(object):
         if stats is not None:
             self.x = (self.x - stats['x'][0]) / stats['x'][1]
             self.y = (self.y - stats['y'][0]) / stats['y'][1]
+            
+        if axes is not None:
+            self.x = self.x[:, axes]
 
+        if add_bias:
+            self.x = np.column_stack([np.ones(self.x.shape[0]), self.x])
+            
         self.x = self.x.astype('float32')
         self.y = self.y.astype('float32')
 

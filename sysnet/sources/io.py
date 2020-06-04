@@ -1,5 +1,6 @@
 ''' I/O utils
 '''
+import os
 import torch
 import fitsio as ft
 import numpy as np
@@ -7,21 +8,68 @@ import numpy as np
 from sklearn.model_selection import train_test_split, KFold
 from torch.utils.data import Dataset, DataLoader
 
-__all__ = ['LoadData']
+__all__ = ['LoadData', 'check_io']
+
+
+
+def check_io(input_path, output_path):
+    """ checks the paths to input and output
+    
+    args:
+        input_path: str, path to the input file
+        output_path: str, path to the output file 
+    
+    """
+    # check input and output
+    if not os.path.exists(input_path):
+        raise RuntimeError(f'{input_path} does not exist!')
+
+    if os.path.exists(output_path):
+        raise RuntimeError(f'{output_path} already exists!')
+
+    output_dir = os.path.dirname(output_path)   # check output dir
+    if not os.path.exists(output_dir):
+        raise RuntimeError(f'{output_dir} does not exist') # fixme: create a dir
+
 
 
 class LoadData:
 
-    def __init__(self, fits_file, do_kfold=False, random_seed=42):
+    def __init__(self, input_file, do_kfold=False, random_seed=42):
         self.random_seed = random_seed
         self.do_kfold = do_kfold
-        self.df = ft.read(fits_file) # ('label', 'hpind', 'features', 'fracgood')
-
+        
+        if input_file.endswith('.fits'):            
+            self.df_split = self.read_fits(input_file)
+        elif input_file.endswith('.npy'):
+            self.df_split = self.read_npy(input_file)
+            
+                
+    def read_npy(self, npy_file):
+        ''' old npy file
+        '''
+        df_raw = np.load(npy_file, allow_pickle=True).item()
+        df = {}
+        for i in range(5):
+            df[i] = (df_raw['train']['fold%d'%i], 
+                     df_raw['validation']['fold%d'%i], 
+                     df_raw['test']['fold%d'%i])
         if self.do_kfold:
-            self.df_kfold = self.split2Kfolds(self.df, k=5, shuffle=True,
-                                              random_seed=random_seed)
+            return df
         else:
-            self.df_split = self.split(self.df)  # 5-fold
+            return df[0]
+    
+    def read_fits(self, fits_file):
+        self.df = ft.read(fits_file) # ('label', 'hpind', 'features', 'fracgood')
+        if self.do_kfold:
+            return self.split2Kfolds(self.df, 
+                                     k=5, 
+                                     shuffle=True,
+                                     random_seed=self.random_seed)
+        else:
+            return self.split(self.df)  # 5-fold     
+        
+        
 
     def load_data(self, batch_size=1024,
                   partition_id=0, normalization='z-score',
@@ -49,7 +97,7 @@ class LoadData:
 
         if self.do_kfold:
             assert -1 < partition_id < 5
-            train, valid, test = self.df_kfold[partition_id]
+            train, valid, test = self.df_split[partition_id]
         else:
             train, valid, test = self.df_split
         
@@ -74,29 +122,29 @@ class LoadData:
         train = ImagingData(train, stats, add_bias=add_bias, axes=axes)
         valid = ImagingData(valid, stats, add_bias=add_bias, axes=axes)
         test = ImagingData(test, stats, add_bias=add_bias, axes=axes)
-
-        datasets_len = {
-                        'train':train.x.shape[0],
-                        'valid':valid.x.shape[0],
-                        'test':test.x.shape[0],
-                        }
+        
+        print(f'baseline train MSE: {np.mean((train.y.mean()-train.y)**2):.3f}') # eq: np.var(train.y)
+        print(f'baseline valid MSE: {np.mean((train.y.mean()-valid.y)**2):.3f}')
+        print(f'baseline test MSE: {np.mean((train.y.mean()-test.y)**2):.3f}')              
+    
 
         datasets = {
-                    'train':MyDataSet(train.x, train.y),
-                    'valid':MyDataSet(valid.x, valid.y),
-                    'test':MyDataSet(test.x, test.y),
+                    'train':MyDataSet(train.x, train.y, train.p, train.w),
+                    'valid':MyDataSet(valid.x, valid.y, valid.p, valid.w),
+                    'test':MyDataSet(test.x, test.y, test.p, test.w),
                     }
         
         if batch_size == -1:
-            return datasets, datasets_len, stats
+            return datasets, stats
         else:            
             dataloaders = {
                             s:DataLoader(datasets[s],
                                         batch_size=batch_size,
-                                        shuffle=True)
+                                        shuffle=True,
+                                        num_workers=0)
                                         for s in ['train', 'valid', 'test']
                           }
-            return dataloaders, datasets_len, stats
+            return dataloaders, stats
         
 
     def split2Kfolds(self, data, k=5, shuffle=True, random_seed=42):
@@ -157,22 +205,25 @@ class ImagingData(object):
             self.x = self.x[:, axes]
 
         if add_bias:
-            self.x = np.column_stack([np.ones(self.x.shape[0]), self.x])
-            
+            self.x = np.column_stack([np.ones(self.x.shape[0]), self.x])            
         self.x = self.x.astype('float32')
         self.y = self.y.astype('float32')
 
 
 class MyDataSet(Dataset):
 
-    def __init__(self, x, y):
+    def __init__(self, x, y, p, w):
         self.x = torch.from_numpy(x)
         self.y = torch.from_numpy(y).unsqueeze(-1)
-
+        self.p = p
+        self.w = w
+        
     def __getitem__(self, index):
         data = self.x[index]
         label = self.y[index]
-        return (data, label)
+        hpix = self.p[index]
+        weight = self.w[index]
+        return (data, label, hpix, weight)
 
     def __len__(self):
         return len(self.x)

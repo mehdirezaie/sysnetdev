@@ -1,3 +1,4 @@
+import os
 import sys
 import json
 from time import time
@@ -23,15 +24,20 @@ class SYSNet:
     '''
 
     def __init__(self, ns):
+        ''' DATA '''        
         self.t0 = time()
-        ''' DATA '''
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.ns = ns
+        src.check_io(self.ns.input_path, self.ns.output_path) # check I/O
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") # check device
         print(f'device: {self.device}')
 
-        self.ld = src.LoadData(ns.input_path, do_kfold=ns.do_kfold)
+        self.ld = src.LoadData(self.ns.input_path, do_kfold=self.ns.do_kfold)
         print(f'data loaded in {time()-self.t0:.3f} sec')
-        self.ns = ns
-        self.metrics = {}        
+
+        self.metrics = {}    
+        self.pred = []
+        self.hpix = []
+             
 
     def run(self,
            eta_min=1.0e-5,
@@ -41,38 +47,38 @@ class SYSNet:
            savefig=True):
 
         if self.ns.do_rfe:
-            self.axes_to_keep = self.rfe(self.ns.axes)
+            self.rfe_output = self.rfe(self.ns.axes)
         
         if self.ns.do_kfold:
             output_path_org = self.ns.output_path
 
             for partition in range(5):
                 key = f'partition_{partition}'
-                
-
-                axes = self.axes_to_keep[key]['axes_to_keep'] if hasattr(self, 'axes_to_keep') else self.ns.axes
-                
+                axes = self.rfe_output[key]['axes_to_keep'] if self.ns.do_rfe else self.ns.axes                
                 structure = (best_structure[0], best_structure[1], len(axes), best_structure[3])
                 
                 data_partition = self.ld.load_data(batch_size=self.ns.batch_size,
                                                    partition_id=partition,
                                                    normalization=self.ns.normalization,
                                                    axes=axes)
-                self.dataloaders, self.datasets_len, self.stats = data_partition
+                self.dataloaders, self.stats = data_partition
 
                 self.ns.output_path = output_path_org.replace('.pt', '_%d.pt'%partition)
 
-                train_val_test_losses = self.__run(eta_min=eta_min,
-                                                    lr_best=lr_best,
-                                                    best_structure=structure,
-                                                    l1_alpha=l1_alpha,
-                                                    savefig=savefig)
+                train_val_test_losses, hpix_pred = self.__run(eta_min=eta_min,
+                                                                lr_best=lr_best,
+                                                                best_structure=structure,
+                                                                l1_alpha=l1_alpha,
+                                                                savefig=savefig)
+                self.hpix.append(hpix_pred[0])
+                self.pred.append(hpix_pred[1])                
                 self.metrics[key] = train_val_test_losses
+               
             self.ns.output_path = output_path_org
 
         else:
             key = 'partition_0'
-            axes = self.axes_to_keep[key]['axes_to_keep'] if hasattr(self, 'axes_to_keep') else self.ns.axes                
+            axes = self.rfe_output[key]['axes_to_keep'] if self.ns.do_rfe else self.ns.axes
             structure = (best_structure[0], best_structure[1], len(axes), best_structure[3])
             
             data_partition = self.ld.load_data(batch_size=self.ns.batch_size,
@@ -80,31 +86,36 @@ class SYSNet:
                                                normalization=self.ns.normalization,
                                                axes=axes)
 
-            self.dataloaders, self.datasets_len, self.stats = data_partition
-            train_val_test_losses = self.__run(eta_min=eta_min,
-                                                lr_best=lr_best,
-                                                best_structure=structure,
-                                                l1_alpha=l1_alpha,
-                                                savefig=savefig)
-                                                
+            self.dataloaders, self.stats = data_partition
+            train_val_test_losses, hpix_pred = self.__run(eta_min=eta_min,
+                                                            lr_best=lr_best,
+                                                            best_structure=structure,
+                                                            l1_alpha=l1_alpha,
+                                                            savefig=savefig)
+            self.hpix.append(hpix_pred[0])
+            self.pred.append(hpix_pred[1])
             self.metrics[key] = train_val_test_losses
 
+        self.pred = torch.cat(self.pred).numpy()
+        self.hpix = torch.cat(self.hpix).numpy()            
         with open(self.ns.output_path.replace('.pt', '_metrics.json'), 'w') as f:
             json.dump(self.metrics, f)
             #print(self.metrics)
 
+        print(self.hpix.size, self.pred.size)
+        
     def rfe(self, axes):
         axes_to_keep = {}
         model = src.LinearRegression(add_bias=True)
         if self.ns.do_kfold:
             for partition in range(5):
-                datasets, sizes, stats = self.ld.load_data(batch_size=-1, 
+                datasets, stats = self.ld.load_data(batch_size=-1, 
                                                            partition_id=partition)
                 fs = src.FeatureElimination(model, datasets)
                 fs.run(axes)
                 axes_to_keep[f'partition_{partition}'] = fs.results
         else:
-            datasets, sizes, stats = self.ld.load_data(batch_size=-1)
+            datasets, stats = self.ld.load_data(batch_size=-1)
             fs = src.FeatureElimination(model, datasets)
             fs.run(axes)  
             axes_to_keep['partition_0'] = fs.results
@@ -121,16 +132,15 @@ class SYSNet:
             best_structure=(3, 20, 18, 1),
             l1_alpha=1.0e-3,
             savefig=True):
-        self.__find_lr(eta_min, lr_best)
+        self.__find_lr(best_structure, eta_min, lr_best)
         self.__find_structure(best_structure)
         self.__find_l1(l1_alpha)
         train_val_losses = self.__train(savefig=savefig)
-        test_loss = self.__evaluate()
+        test_loss, hpix_pred = self.__evaluate()
+        return {**train_val_losses, **test_loss}, hpix_pred
 
-        return {**train_val_losses, **test_loss}
 
-
-    def __find_lr(self, eta_min=1.0e-5, lr_best=1.0e-3, seed=42):
+    def __find_lr(self, best_structure=(4, 20, 18, 1), eta_min=1.0e-5, lr_best=1.0e-3, seed=42):
 
         if self.ns.find_lr:
             ''' LEARNING RATE
@@ -138,7 +148,7 @@ class SYSNet:
             # --- find learning rate
             fig, ax = plt.subplots()
             torch.manual_seed(seed=seed)
-            model = src.DNN(3, 20, 18, 1)
+            model = src.DNN(*best_structure)
             optimizer = AdamW(params=model.parameters(),
                               lr=1.0e-7,
                               betas=(0.9, 0.999),
@@ -179,7 +189,6 @@ class SYSNet:
             criterion = MSELoss() # reduction='mean'
             self.best_structure = src.tune_model_structure(src.DNN,
                                                           self.dataloaders,
-                                                          self.datasets_len,
                                                           criterion,
                                                           10, #self.ns.nepochs,
                                                           self.device,
@@ -203,7 +212,6 @@ class SYSNet:
             criterion = MSELoss() # reduction='mean'
             self.l1_alpha = src.tune_L1(model,
                                 self.dataloaders,
-                                self.datasets_len,
                                 criterion,
                                 optimizer,
                                 10, #self.ns.nepochs,
@@ -226,7 +234,6 @@ class SYSNet:
         criterion = MSELoss() # reduction='mean'
         train_losses, val_losses, best_val_loss = src.train_val(model=model,
                                                                 dataloaders=self.dataloaders,
-                                                                datasets_len=self.datasets_len,
                                                                 criterion=criterion,
                                                                 optimizer=optimizer,
                                                                 nepochs=self.ns.nepochs,
@@ -260,12 +267,11 @@ class SYSNet:
         model = src.DNN(*self.best_structure)
         model.load_state_dict(torch.load(self.ns.output_path))
         criterion = MSELoss() # reduction='mean'
-        test_loss = src.evaluate(model=model,
-                            dataloaders=self.dataloaders,
-                            datasets_len=self.datasets_len,
-                            criterion=criterion,
-                            device=self.device,
-                            phase='test')
+        test_loss, hpix_pred = src.evaluate(model=model,
+                                            dataloaders=self.dataloaders,
+                                            criterion=criterion,
+                                            device=self.device,
+                                            phase='test')
         print(f'finish evaluation in {time()-self.t0:.3f} sec')
         print(f'test loss: {test_loss:.3f}')
-        return {'test_loss':test_loss}
+        return {'test_loss':test_loss}, hpix_pred

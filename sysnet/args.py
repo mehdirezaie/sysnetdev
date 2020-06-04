@@ -59,5 +59,27 @@ def parse_cmd_arguments(parser):
                         default=False,
                         action='store_true',
                         help='perform recursive feature elimination')
+    
+    parser.add_argument('--eta_min',
+                        type=float,
+                        default=1.0e-5,
+                        help='min eta for LR finder')
+    
+    parser.add_argument('--lr_best',
+                        type=float,
+                        default=1.0e-3,
+                        help='best initial learning rate')
 
+    parser.add_argument('--best_structure',
+                        type=int,
+                        default=(4, 20, 18, 1),
+                        nargs='*',
+                        help='structure ( # hidden layer, # neurons, # features, 1 )')
+    
+    parser.add_argument('--l1_alpha',
+                        type=float,
+                        default=1.0e-3,
+                        help='L1 scale')
+
+    
     return parser.parse_args()

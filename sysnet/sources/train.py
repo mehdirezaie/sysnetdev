@@ -113,7 +113,6 @@ def tune_model_structure(DNN,
 
 def train_val(model,
               dataloaders,
-              datasets_len,
               criterion,
               optimizer,
               nepochs,
@@ -132,7 +131,6 @@ def train_val(model,
     -------
     model: module, torch.nn.modules.module.Module
     dataloaders: dict, of torch.utils.data.dataloader
-    datasets_len: dict, of training size, ...
     criterion: torch.nn.modules.loss, e.g., MSELoss
     optimizer: torch.optim.optimizer.Optimizer, e.g., AdamW
     nepochs: int,
@@ -164,8 +162,8 @@ def train_val(model,
     #--- training loop `nepochs` ---
     num_iter = len(dataloaders['train']) # number of training updates
     for epoch in range(nepochs):
-        running_train_loss = 0.0
-        running_valid_loss = 0.0
+        running_train_loss = RunningAverage()
+        running_valid_loss = RunningAverage()
         print(f'Epoch {epoch:02d}/{nepochs-1:2d}', end=' ')
 
         for phase in ['train', 'valid']:
@@ -173,7 +171,7 @@ def train_val(model,
                 model.train()
 
                 i = 0
-                for (data, target) in dataloaders[phase]: # training update
+                for (data, target, _, _) in dataloaders[phase]: # training update
                     data = data.to(device)
                     target = target.to(device)
                     if scheduler is not None:
@@ -198,22 +196,22 @@ def train_val(model,
 
                     loss.backward()
                     optimizer.step()
-                    running_train_loss += loss.item() * data.size(0)
+                    running_train_loss.update(loss.item()* data.size(0), data.size(0))
 
-                loss_train_epoch = running_train_loss / datasets_len[phase]
+                loss_train_epoch = running_train_loss()
                 train_losses.append(loss_train_epoch)
                 print(f'{phase} loss: {loss_train_epoch:.3f}', end=' ')
             else:
                 with torch.no_grad():
                     model.eval()
-                    for (data, target) in dataloaders[phase]: # validation set
+                    for (data, target, _, _) in dataloaders[phase]: # validation set
                         data = data.to(device)
                         target = target.to(device)
                         outputs = model(data)
                         loss = criterion(outputs, target)
-                        running_valid_loss += loss.item() * data.size(0)
+                        running_valid_loss.update(loss.item()* data.size(0), data.size(0))
 
-                    loss_valid_epoch = running_valid_loss / datasets_len[phase]
+                    loss_valid_epoch = running_valid_loss()
                     valid_losses.append(loss_valid_epoch)
                     print(f'{phase} loss: {loss_valid_epoch:.3f}', end=' ')
                     if (loss_valid_epoch < best_val_loss):
@@ -242,16 +240,57 @@ def train_val(model,
 
 def evaluate(model,
             dataloaders,
-            datasets_len,
             criterion,
             device,
             phase='test'):
+    # should I 
     model = model.to(device)
+    
+    #list_target = []
+    list_hpix = []
+    list_prediction = []
+    
     with torch.no_grad():
         model.eval()
-        loss = 0
-        for data, target in dataloaders[phase]:
+        loss = RunningAverage()
+        for (data, target, hpix, _) in dataloaders[phase]:
             data = data.to(device)
             target = target.to(device)
-            loss += criterion(target, model(data)) * data.size(0)
-    return (loss / datasets_len[phase]).item()
+            prediction = model(data)
+            loss.update(criterion(target, prediction).item() * data.size(0), data.size(0))
+            
+            #list_target.append(target)
+            list_hpix.append(hpix)
+            list_prediction.append(prediction)
+            
+    list_hpix = torch.cat(list_hpix)
+    list_prediction = torch.cat(list_prediction)
+    
+    #list_target = torch.cat(list_target)
+    hpix_pred = [list_hpix, list_prediction.squeeze()]
+    
+    return loss(), hpix_pred
+
+
+
+class RunningAverage():
+    """A simple class that maintains the running average of a quantity
+    
+    Example:
+    ```
+    loss_avg = RunningAverage()
+    loss_avg.update(2)
+    loss_avg.update(4)
+    loss_avg() = 3
+    ```
+    """
+    def __init__(self):
+        self.steps = 0
+        self.total = 0
+    
+    def update(self, val, step):
+        self.total += val
+        self.steps += step
+    
+    def __call__(self):
+        return self.total/float(self.steps)

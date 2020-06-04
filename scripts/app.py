@@ -16,9 +16,15 @@ ns = sysnet.parse_cmd_arguments(ap)
 for (key, value) in ns.__dict__.items():
     print(f'{key}: {value}')
 
+    
+# preprocess    
+
+# feature selection and regression
 my_sysnet = sysnet.SYSNet(ns)
-my_sysnet.run(eta_min=1.0e-5,
-              lr_best=1.0e-3,
-              best_structure=(4, 20, 18, 1),
-              l1_alpha=1.0e-3,
+my_sysnet.run(eta_min=ns.eta_min,
+              lr_best=ns.lr_best,
+              best_structure=ns.best_structure,
+              l1_alpha=ns.l1_alpha,
               savefig=True)
+
+# post-process

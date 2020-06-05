@@ -41,7 +41,7 @@ class FeatureElimination:
 
         arg = np.argmin(val_loss)
 
-        self.logger.info(f'attribute index-{arg} with {val_loss[arg]}')
+        self.logger.info(f'attribute index-{axes[arg]} with {val_loss[arg]:.3f}')
         self.results['val_loss'].append(val_loss)
         self.results['axes'].append(axes.copy())
         self.results['importance'].append(axes.pop(arg))

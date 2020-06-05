@@ -24,8 +24,9 @@ class DNN(nn.Module):
     input = Variable(torch.Tensor(10, 500))
     output = a(input)
     '''
-    def __init__(self, nb_layers, nb_units, input_dim, output_dim):
+    def __init__(self, nb_layers, nb_units, input_dim=18, output_dim=1, seed=42):
         assert nb_layers >= 2
+        torch.manual_seed(seed=seed)
         super(DNN, self).__init__()
         self.fc = nn.ModuleList()#[]
         self.bn = nn.ModuleList()#[]

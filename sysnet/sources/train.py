@@ -1,6 +1,7 @@
 import copy
 import torch
 import os
+import logging
 import numpy as np
 from torch.optim import AdamW
 from .callbacks import EarlyStopping
@@ -49,7 +50,7 @@ def tune_L1(model,
                 'best_val_losses':[]
                 }
     for l1_lambda in l1_lambdas:
-        print(f'l1_lambda: {l1_lambda}')
+        logging.info(f'l1_lambda: {l1_lambda}')
         # reset model weights
         model.apply(weight_reset)
         # call train_val ?
@@ -86,10 +87,9 @@ def tune_model_structure(DNN,
                 'best_val_losses':[]
                 }
     for structure in structures:
-        print(f'model with {structure}')
+        logging.info(f'model with {structure}')
 
         # reset model weights
-        torch.manual_seed(seed=seed)
         model = DNN(*structure) # e.g., (3, 20, 18, 1)
 
         optimizer = AdamW(params=model.parameters(), **adamw_kw)
@@ -164,7 +164,7 @@ def train_val(model,
     for epoch in range(nepochs):
         running_train_loss = RunningAverage()
         running_valid_loss = RunningAverage()
-        print(f'Epoch {epoch:02d}/{nepochs-1:2d}', end=' ')
+        msg = f'Epoch {epoch:02d}/{nepochs-1:2d} '
 
         for phase in ['train', 'valid']:
             if phase=='train':
@@ -200,7 +200,7 @@ def train_val(model,
 
                 loss_train_epoch = running_train_loss()
                 train_losses.append(loss_train_epoch)
-                print(f'{phase} loss: {loss_train_epoch:.3f}', end=' ')
+                msg += f'{phase} loss: {loss_train_epoch:.3f} '
             else:
                 with torch.no_grad():
                     model.eval()
@@ -213,17 +213,16 @@ def train_val(model,
 
                     loss_valid_epoch = running_valid_loss()
                     valid_losses.append(loss_valid_epoch)
-                    print(f'{phase} loss: {loss_valid_epoch:.3f}', end=' ')
+                    msg += f'{phase} loss: {loss_valid_epoch:.3f} '
                     if (loss_valid_epoch < best_val_loss):
                         best_val_loss = loss_valid_epoch
                         if output_path is not None:
                             best_model_wts = copy.deepcopy(model.state_dict())
 
         if scheduler is not None:
-            print(f'lr: {scheduler.get_lr()[0]:.6f}')
-        else:
-            print('')
+            msg += f'lr: {scheduler.get_lr()[0]:.6f}'
 
+        logging.info(msg)
         # Early stopping
         # early_stopping(loss_valid_epoch)
         # if early_stopping.early_stop:
@@ -234,7 +233,7 @@ def train_val(model,
         if os.path.exists(output_path):
             raise RuntimeError(f'{output_path} already exists!')
         torch.save(best_model_wts, output_path)
-        print(f'save model at {output_path}')
+        logging.info(f'save model at {output_path}')
     return train_losses, valid_losses, best_val_loss
 
 
@@ -257,7 +256,7 @@ def evaluate(model,
             data = data.to(device)
             target = target.to(device)
             prediction = model(data)
-            loss.update(criterion(target, prediction).item() * data.size(0), data.size(0))
+            loss.update(criterion(prediction, target).item() * data.size(0), data.size(0))
             
             #list_target.append(target)
             list_hpix.append(hpix)

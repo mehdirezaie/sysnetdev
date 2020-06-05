@@ -4,6 +4,21 @@ __all__ = ['parse_cmd_arguments']
 def parse_cmd_arguments(parser):
     ''' command argument parser
     '''
+    parser.add_argument('-d', '--data',
+                        type=str,
+                        default='../input/eBOSS_QSO_full_NGC_v7_2.dat.fits',
+                        help='path to the input data catalog')
+    
+    parser.add_argument('-r', '--randoms',
+                        type=str,
+                        default='../input/eBOSS_QSO_full_NGC_v7_2.ran.fits',
+                        help='path to the input random catalogs')
+    
+    parser.add_argument('-t', '--templates',
+                        type=str,
+                        default='../input/SDSS_WISE_HI_imageprop_nside512.h5',
+                        help='path to the input random catalogs')
+    
     parser.add_argument('-i', '--input_path',
                         type=str,
                         default='../input/eBOSS.ELG.NGC.DR7.table.fits',
@@ -49,6 +64,11 @@ def parse_cmd_arguments(parser):
                         default='z-score',
                         help='standardization method')
     
+    parser.add_argument('--loss',
+                        type=str,
+                        default='mse',
+                        help='Cost function (loss) e.g., mse, pll')    
+    
     parser.add_argument('-ax', '--axes',
                         type=int,
                         nargs='*',
@@ -80,6 +100,16 @@ def parse_cmd_arguments(parser):
                         type=float,
                         default=1.0e-3,
                         help='L1 scale')
-
     
+    parser.add_argument('-z', '--zbins',
+                        type=float,
+                        nargs='*',
+                        default=[0.8, 2.2, 3.5],
+                        help='redshift bin edges')
+    
+    parser.add_argument('--nside', 
+                        type=int,
+                        default=512,
+                        help='minibatch size')    
+
     return parser.parse_args()

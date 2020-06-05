@@ -4,7 +4,7 @@ import os
 import torch
 import fitsio as ft
 import numpy as np
-
+import logging
 from sklearn.model_selection import train_test_split, KFold
 from torch.utils.data import Dataset, DataLoader
 
@@ -34,7 +34,8 @@ def check_io(input_path, output_path):
 
 
 class LoadData:
-
+    
+    logger = logging.getLogger()
     def __init__(self, input_file, do_kfold=False, random_seed=42):
         self.random_seed = random_seed
         self.do_kfold = do_kfold
@@ -123,9 +124,9 @@ class LoadData:
         valid = ImagingData(valid, stats, add_bias=add_bias, axes=axes)
         test = ImagingData(test, stats, add_bias=add_bias, axes=axes)
         
-        print(f'baseline train MSE: {np.mean((train.y.mean()-train.y)**2):.3f}') # eq: np.var(train.y)
-        print(f'baseline valid MSE: {np.mean((train.y.mean()-valid.y)**2):.3f}')
-        print(f'baseline test MSE: {np.mean((train.y.mean()-test.y)**2):.3f}')              
+        self.logger.info(f'baseline train MSE: {np.mean((train.y.mean()-train.y)**2):.3f}') # eq: np.var(train.y)
+        self.logger.info(f'baseline valid MSE: {np.mean((train.y.mean()-valid.y)**2):.3f}')
+        self.logger.info(f'baseline test MSE: {np.mean((train.y.mean()-test.y)**2):.3f}')              
     
 
         datasets = {

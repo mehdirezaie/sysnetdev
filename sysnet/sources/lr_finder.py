@@ -207,7 +207,7 @@ class LRFinder(object):
             raise ValueError("expected one of (exp, linear), got {}".format(step_mode))
 
         if smooth_f < 0 or smooth_f >= 1:
-            raise ValueError("smooth_f is outside the range [0, 1[")
+            raise ValueError("smooth_f is outside the range [0, 1]")
 
         # Create an iterator to get data batch by batch
         iter_wrapper = DataLoaderIterWrapper(train_loader)

@@ -5,6 +5,8 @@ import logging
 import numpy as np
 from torch.optim import AdamW
 from .callbacks import EarlyStopping
+
+
 __all__ = ['train_val', 'evaluate', 'tune_L1', 'tune_model_structure']
 
 ''' Train DL models
@@ -164,8 +166,8 @@ def train_val(model,
     for epoch in range(nepochs):
         running_train_loss = RunningAverage()
         running_valid_loss = RunningAverage()
-        msg = f'Epoch {epoch:02d}/{nepochs-1:2d} '
-
+        msg = f'Epoch {epoch}/{nepochs-1} '
+        
         for phase in ['train', 'valid']:
             if phase=='train':
                 model.train()
@@ -220,7 +222,7 @@ def train_val(model,
                             best_model_wts = copy.deepcopy(model.state_dict())
 
         if scheduler is not None:
-            msg += f'lr: {scheduler.get_lr()[0]:.6f}'
+            msg += f'lr: {scheduler.get_last_lr()[0]:.6f}' # or {scheduler.get_lr()[0]:.6f}
 
         logging.info(msg)
         # Early stopping
@@ -262,13 +264,11 @@ def evaluate(model,
             list_hpix.append(hpix)
             list_prediction.append(prediction)
             
-    list_hpix = torch.cat(list_hpix)
-    list_prediction = torch.cat(list_prediction)
-    
-    #list_target = torch.cat(list_target)
-    hpix_pred = [list_hpix, list_prediction.squeeze()]
-    
-    return loss(), hpix_pred
+    hpix = torch.cat(list_hpix)
+    pred = torch.cat(list_prediction).squeeze()
+    test_loss = loss()
+        
+    return test_loss, hpix, pred
 
 
 

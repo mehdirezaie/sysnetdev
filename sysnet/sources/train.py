@@ -254,7 +254,7 @@ def evaluate(model,
     with torch.no_grad():
         model.eval()
         loss = RunningAverage()
-        for (data, target, hpix, _) in dataloaders[phase]:
+        for (data, target, _, hpix) in dataloaders[phase]:
             data = data.to(device)
             target = target.to(device)
             prediction = model(data)

@@ -1,3 +1,3 @@
 
-from .init_sysnet import *
+from .lab import *
 from .args import *

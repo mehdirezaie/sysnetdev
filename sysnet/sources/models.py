@@ -9,7 +9,7 @@ import numpy as np
 
 import logging
 
-__all__ = ['DNN', 'LinearRegression', 'LinearNet']
+__all__ = ['DNN', 'LinearRegression', 'LinearNet', 'DNNPoisson']
 
 
 class DNN(nn.Module):
@@ -47,11 +47,39 @@ class DNN(nn.Module):
     def forward(self, x):
         for i in range(self.nb_layers):
             if i == self.nb_layers-1:
-                 x = self.fc[i](x)
+                x = self.fc[i](x)
             else:
-                 x = F.relu(self.fc[i](x))
-                 x = self.bn[i](x)
+                x = F.relu(self.fc[i](x))
+                x = self.bn[i](x)                
         return x
+    
+
+class DNNPoisson(DNN):
+    '''
+    credit: https://discuss.pytorch.org/u/matthew_zeng/
+
+    TODO: take a list of hidden layer neurons
+
+    examples
+    ---------
+    a = DNN(3, 100, 500, 500)
+    input = Variable(torch.Tensor(10, 500))
+    output = a(input)
+    '''
+    def __init__(self, nb_layers, nb_units, input_dim=18, output_dim=1, seed=42):
+        super(DNNPoisson, self).__init__(nb_layers, nb_units, 
+                                         input_dim=input_dim, output_dim=output_dim,
+                                         seed=seed)
+
+    def forward(self, x):
+        for i in range(self.nb_layers):
+            if i == self.nb_layers-1:
+                x = self.fc[i](x)
+                x = F.softplus(x, threshold=1000)
+            else:
+                x = F.relu(self.fc[i](x))
+                x = self.bn[i](x)                
+        return x    
 
 class LinearNet(nn.Module):
 

@@ -8,9 +8,42 @@ import logging
 from sklearn.model_selection import train_test_split, KFold
 from torch.utils.data import Dataset, DataLoader
 
-__all__ = ['LoadData', 'check_io']
+import json
+from json import JSONEncoder
 
 
+__all__ = ['LoadData', 'check_io', 'SYSNetCollector']
+
+class SYSNetCollector:
+    
+    def __init__(self):
+        self.metrics = {}
+        self.pred = []
+        self.hpix = []
+        
+    def collect(self, key, metrics, hpix, pred):
+        self.metrics[key] = metrics
+        self.hpix.append(hpix)
+        self.pred.append(pred)
+                
+    def save(self, output_path):
+        self.pred = torch.cat(self.pred).numpy()
+        self.hpix = torch.cat(self.hpix).numpy()            
+        
+        with open(output_path, 'w') as output_file:
+            json.dump({'hpix':self.hpix, 
+                       'pred':self.pred, 
+                       'metrics':self.metrics}, 
+                      output_file, cls=NumpyArrayEncoder)
+
+
+class NumpyArrayEncoder(JSONEncoder):
+    # https://pynative.com/python-serialize-numpy-ndarray-into-json/
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return JSONEncoder.default(self, obj)
+    
 
 def check_io(input_path, output_path):
     """ checks the paths to input and output
@@ -74,7 +107,7 @@ class LoadData:
 
     def load_data(self, batch_size=1024,
                   partition_id=0, normalization='z-score',
-                  add_bias=False, axes=None):
+                  add_bias=False, axes=None, criterion=None):
         '''
         This function loads the data generators from a fits file.
 
@@ -124,10 +157,21 @@ class LoadData:
         valid = ImagingData(valid, stats, add_bias=add_bias, axes=axes)
         test = ImagingData(test, stats, add_bias=add_bias, axes=axes)
         
-        self.logger.info(f'baseline train MSE: {np.mean((train.y.mean()-train.y)**2):.3f}') # eq: np.var(train.y)
-        self.logger.info(f'baseline valid MSE: {np.mean((train.y.mean()-valid.y)**2):.3f}')
-        self.logger.info(f'baseline test MSE: {np.mean((train.y.mean()-test.y)**2):.3f}')              
-    
+        if criterion is not None:        
+            train_ymean = torch.from_numpy(train.y).mean()
+            # eq: np.var(train.y) if MSE
+            
+            baseline_losses = {'base_train_loss':criterion(train_ymean.expand(train.y.size), 
+                                                               torch.from_numpy(train.y)).item(),
+                               'base_val_loss':criterion(train_ymean.expand(valid.y.size), 
+                                                               torch.from_numpy(valid.y)).item(),
+                               'base_test_loss':criterion(train_ymean.expand(test.y.size), 
+                                                              torch.from_numpy(test.y)).item()}
+            for s in baseline_losses:
+                self.logger.info(f'{s}: {baseline_losses[s]:.3f}') 
+                
+            stats = {**stats, **baseline_losses}
+            
 
         datasets = {
                     'train':MyDataSet(train.x, train.y, train.p, train.w),
@@ -200,7 +244,7 @@ class ImagingData(object):
 
         if stats is not None:
             self.x = (self.x - stats['x'][0]) / stats['x'][1]
-            self.y = (self.y - stats['y'][0]) / stats['y'][1]
+            #self.y = (self.y - stats['y'][0]) / stats['y'][1]
             
         if axes is not None:
             self.x = self.x[:, axes]
@@ -224,7 +268,7 @@ class MyDataSet(Dataset):
         label = self.y[index]
         hpix = self.p[index]
         weight = self.w[index]
-        return (data, label, hpix, weight)
+        return (data, label, weight, hpix)
 
     def __len__(self):
         return len(self.x)

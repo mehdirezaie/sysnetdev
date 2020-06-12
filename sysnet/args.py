@@ -26,7 +26,7 @@ def parse_cmd_arguments(parser):
 
     parser.add_argument('-o', '--output_path',
                         type=str,
-                        default='../checkpoints/model_test.pt',
+                        default='../output/model_test.pt',
                         help='path to the output')
 
     parser.add_argument('-bs', '--batch_size',
@@ -67,7 +67,12 @@ def parse_cmd_arguments(parser):
     parser.add_argument('--loss',
                         type=str,
                         default='mse',
-                        help='Cost function (loss) e.g., mse, pll')    
+                        help='Cost function (loss) e.g., mse, npll')  
+    
+    parser.add_argument('--model',
+                        type=str,
+                        default='dnn',
+                        help='model, dnn or dnnp')      
     
     parser.add_argument('-ax', '--axes',
                         type=int,

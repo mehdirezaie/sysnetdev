@@ -50,7 +50,7 @@ class SYSNet:
         
         if self.ns.model=='dnn':
             self.Model = src.DNN
-        else:
+        elif self.ns.model=='dnnp':
             self.Model = src.DNNPoisson
 
     def load(self):              
@@ -169,7 +169,7 @@ class SYSNet:
                                                                 output_path=self.ns.output_path,
                                                                 scheduler=scheduler,
                                                                 L1lambda=self.l1_alpha,
-                                                                L1norm=True)
+                                                                L1norm=False) # fixme
 
         self.logger.info(f'finish training in {time()-self.t0:.3f} sec')
         # save train and validation losses
@@ -189,7 +189,7 @@ class SYSNet:
                     plt.axhline(self.stats[baseline], c=c[i], ls=':', lw=1)
                                
             plt.legend()
-            plt.ylabel('MSE')
+            plt.ylabel(self.ns.loss.upper()) # MSE or NPLL
             plt.xlabel('Epochs')
             plt.savefig(self.ns.output_path.replace('.pt', '_loss.png'),
                         bbox_inches='tight')

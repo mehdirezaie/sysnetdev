@@ -185,7 +185,7 @@ def train_val(model,
 
                     # only on training phase
                     with torch.set_grad_enabled(phase == 'train'):
-                        outputs = model(data)*fpix
+                        outputs = model(data)*fpix.unsqueeze(-1)
                         loss = criterion(outputs, target)
 
                         if L1norm | L2norm:

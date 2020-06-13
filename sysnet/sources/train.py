@@ -173,9 +173,11 @@ def train_val(model,
                 model.train()
 
                 i = 0
-                for (data, target, _, _) in dataloaders[phase]: # training update
+                for (data, target, fpix, _) in dataloaders[phase]: # training update
                     data = data.to(device)
                     target = target.to(device)
+                    fpix = fpix.to(device)
+                    
                     if scheduler is not None:
                         scheduler.step(epoch+i/num_iter)
                         i+=1
@@ -183,7 +185,7 @@ def train_val(model,
 
                     # only on training phase
                     with torch.set_grad_enabled(phase == 'train'):
-                        outputs = model(data)
+                        outputs = model(data)*fpix
                         loss = criterion(outputs, target)
 
                         if L1norm | L2norm:
@@ -206,10 +208,12 @@ def train_val(model,
             else:
                 with torch.no_grad():
                     model.eval()
-                    for (data, target, _, _) in dataloaders[phase]: # validation set
+                    for (data, target, fpix, _) in dataloaders[phase]: # validation set
                         data = data.to(device)
                         target = target.to(device)
-                        outputs = model(data)
+                        fpix = fpix.to(device)
+                        
+                        outputs = model(data)*fpix.unsqueeze(-1)
                         loss = criterion(outputs, target)
                         running_valid_loss.update(loss.item()* data.size(0), data.size(0))
 
@@ -254,13 +258,14 @@ def evaluate(model,
     with torch.no_grad():
         model.eval()
         loss = RunningAverage()
-        for (data, target, _, hpix) in dataloaders[phase]:
+        for (data, target, fpix, hpix) in dataloaders[phase]:
             data = data.to(device)
             target = target.to(device)
-            prediction = model(data)
-            loss.update(criterion(prediction, target).item() * data.size(0), data.size(0))
+            fpix = fpix.to(device)            
             
-            #list_target.append(target)
+            prediction = model(data) * fpix.unsqueeze(-1)
+            loss.update(criterion(prediction, target).item() * data.size(0), data.size(0))
+
             list_hpix.append(hpix)
             list_prediction.append(prediction)
             

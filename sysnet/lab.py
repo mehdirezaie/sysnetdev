@@ -47,12 +47,8 @@ class SYSNet:
         
         self.Cost, self.cost_kwargs = src.init_loss(self.ns.loss)
         self.collector = src.SYSNetCollector()
+        self.Model = src.init_model(self.ns.model)
         
-        if self.ns.model=='dnn':
-            self.Model = src.DNN
-        elif self.ns.model=='dnnp':
-            self.Model = src.DNNPoisson
-
     def load(self):              
         self.ld = src.LoadData(self.ns.input_path, do_kfold=self.ns.do_kfold) # check data
         self.logger.info(f'data loaded in {time()-self.t0:.3f} sec')
@@ -111,7 +107,7 @@ class SYSNet:
             
             self.collector.collect(key, {**metrics, **self.stats}, hpix, pred)
             
-        self.collector.save(self.ns.output_path.replace('.pt', '_hpixngal.json'))
+        self.collector.save(self.ns.output_path.replace('.pt', '.json'))
 
         
     def __run_rfe(self, axes):

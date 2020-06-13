@@ -9,7 +9,19 @@ import numpy as np
 
 import logging
 
-__all__ = ['DNN', 'LinearRegression', 'LinearNet', 'DNNPoisson']
+__all__ = ['DNN', 'LinearRegression', 'LinearNet', 'DNNPoisson', 'init_model']
+
+
+def init_model(model):
+    if model=='dnn':
+        return DNN
+    elif model=='dnnp':
+        return DNNPoisson
+    else:
+        raise NotImplementedError(f'Model {model} is not implemented!')
+
+    
+
 
 
 class DNN(nn.Module):

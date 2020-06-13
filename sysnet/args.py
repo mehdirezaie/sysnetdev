@@ -67,7 +67,7 @@ def parse_cmd_arguments(parser):
     parser.add_argument('--loss',
                         type=str,
                         default='mse',
-                        help='Cost function (loss) e.g., mse, npll')  
+                        help='Cost function (loss) e.g., mse, pnll')  
     
     parser.add_argument('--model',
                         type=str,

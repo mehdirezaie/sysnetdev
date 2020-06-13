@@ -9,7 +9,7 @@ def init_loss(metric):
     metric = metric.lower()
     if metric=='mse':
         return MSELoss, {'reduction':'mean'}
-    elif metric=='npll':
+    elif metric=='pnll':
         return PoissonNLLLoss, {'log_input':False}
     else:
         raise NotImplementedError(f'{metric} not implemented')

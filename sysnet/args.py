@@ -115,6 +115,6 @@ def parse_cmd_arguments(parser):
     parser.add_argument('--nside', 
                         type=int,
                         default=512,
-                        help='minibatch size')    
+                        help='HEALPix nside')    
 
     return parser.parse_args()

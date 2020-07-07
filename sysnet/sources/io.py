@@ -4,6 +4,7 @@ import os
 import torch
 import fitsio as ft
 import numpy as np
+import healpy as hp
 import logging
 from sklearn.model_selection import train_test_split, KFold
 from torch.utils.data import Dataset, DataLoader
@@ -14,28 +15,38 @@ from json import JSONEncoder
 
 __all__ = ['LoadData', 'check_io', 'SYSNetCollector']
 
+
+def tohp(nside, hpind, values):
+    zeros = np.empty(12*nside*nside, dtype=values.dtype)
+    zeros[:] = np.nan 
+    zeros[hpind] = values
+    return zeros
+
 class SYSNetCollector:
     
     def __init__(self):
         self.metrics = {}
         self.pred = []
-        self.hpix = []
+        self.hpind = []
         
-    def collect(self, key, metrics, hpix, pred):
+    def collect(self, key, metrics, hpind, pred):
         self.metrics[key] = metrics
-        self.hpix.append(hpix)
+        self.hpind.append(hpind)
         self.pred.append(pred)
                 
-    def save(self, output_path):
+    def save(self, output_path, nside):
         self.pred = torch.cat(self.pred).numpy()
-        self.hpix = torch.cat(self.hpix).numpy()            
+        self.hpind = torch.cat(self.hpind).numpy()            
         
         with open(output_path, 'w') as output_file:
-            json.dump({'hpix':self.hpix, 
+            json.dump({'hpind':self.hpind, 
                        'pred':self.pred, 
                        'metrics':self.metrics}, 
                       output_file, cls=NumpyArrayEncoder)
-
+            
+        hpmap = tohp(nside, self.hpind, self.pred)
+        hp.write_map(output_path.replace('.json', f'.hp{nside}.fits'), hpmap, 
+                     overwrite=True, dtype=hpmap.dtype)
 
 class NumpyArrayEncoder(JSONEncoder):
     # https://pynative.com/python-serialize-numpy-ndarray-into-json/
@@ -60,6 +71,8 @@ def check_io(input_path, output_path):
     if os.path.exists(output_path):
         raise RuntimeError(f'{output_path} already exists!')
 
+    if not output_path.endswith('.pt'):
+        raise ValueError(f'{output_path} must end with .pt')
     output_dir = os.path.dirname(output_path)   # check output dir
     if not os.path.exists(output_dir):
         raise RuntimeError(f'{output_dir} does not exist') # fixme: create a dir
@@ -266,9 +279,9 @@ class MyDataSet(Dataset):
     def __getitem__(self, index):
         data = self.x[index]
         label = self.y[index]
-        hpix = self.p[index]
+        hpind = self.p[index]
         weight = self.w[index]
-        return (data, label, weight, hpix)
+        return (data, label, weight, hpind)
 
     def __len__(self):
         return len(self.x)

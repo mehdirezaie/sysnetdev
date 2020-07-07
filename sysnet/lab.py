@@ -59,7 +59,8 @@ class SYSNet:
            lr_best=1.0e-3,
            best_structure=(3, 20, 18, 1),
            l1_alpha=1.0e-3,
-           savefig=True):
+           savefig=True,
+           seed=42):
         
         if self.ns.do_rfe:
             self.rfe_output = self.__run_rfe(self.ns.axes)
@@ -79,13 +80,14 @@ class SYSNet:
                                                                  axes=axes,
                                                                  criterion=self.Cost(**self.cost_kwargs))
                 
-                metrics, hpix, pred = self.__run(eta_min=eta_min,
+                metrics, hpind, pred = self.__run(eta_min=eta_min,
                                                 lr_best=lr_best,
                                                 best_structure=structure,
                                                 l1_alpha=l1_alpha,
-                                                savefig=savefig)
+                                                savefig=savefig,
+                                                seed=seed)
                 
-                self.collector.collect(key, {**metrics, **self.stats}, hpix, pred)
+                self.collector.collect(key, {**metrics, **self.stats}, hpind, pred)
             self.ns.output_path = output_path_org
 
         else:
@@ -99,15 +101,16 @@ class SYSNet:
                                                              axes=axes,
                                                              criterion=self.Cost(**self.cost_kwargs))
 
-            metrics, hpix, pred = self.__run(eta_min=eta_min,
+            metrics, hpind, pred = self.__run(eta_min=eta_min,
                                             lr_best=lr_best,
                                             best_structure=structure,
                                             l1_alpha=l1_alpha,
-                                            savefig=savefig)
+                                            savefig=savefig,
+                                            seed=seed)
             
-            self.collector.collect(key, {**metrics, **self.stats}, hpix, pred)
+            self.collector.collect(key, {**metrics, **self.stats}, hpind, pred)
             
-        self.collector.save(self.ns.output_path.replace('.pt', '.json'))
+        self.collector.save(self.ns.output_path.replace('.pt', '.json'), self.ns.nside)
 
         
     def __run_rfe(self, axes):
@@ -138,18 +141,19 @@ class SYSNet:
             lr_best=1.0e-3,
             best_structure=(3, 20, 18, 1),
             l1_alpha=1.0e-3,
-            savefig=True):
+            savefig=True,
+            seed=42):
         self.__find_lr(best_structure, eta_min, lr_best)
         self.__find_structure(best_structure)
         self.__find_l1(l1_alpha)
-        train_val_losses = self.__train(savefig=savefig)
-        test_loss, hpix, pred = self.__evaluate()
-        return {**train_val_losses, **test_loss}, hpix, pred
+        train_val_losses = self.__train(savefig=savefig, seed=seed)
+        test_loss, hpind, pred = self.__evaluate()
+        return {**train_val_losses, **test_loss}, hpind, pred
 
     def __train(self, savefig=True, seed=42):
         ''' TRAINING
         '''
-        model = self.Model(*self.best_structure)
+        model = self.Model(*self.best_structure, seed=seed)
         optimizer = src.AdamW(params=model.parameters(), **self.adamw_kw)
         scheduler = src.CosineAnnealingWarmRestarts(optimizer,
                                                T_0=10,
@@ -204,14 +208,14 @@ class SYSNet:
         model = self.Model(*self.best_structure)
         model.load_state_dict(torch.load(self.ns.output_path))
         criterion = self.Cost(**self.cost_kwargs)
-        test_loss, hpix, pred = src.evaluate(model=model,
+        test_loss, hpind, pred = src.evaluate(model=model,
                                             dataloaders=self.dataloaders,
                                             criterion=criterion,
                                             device=self.device,
                                             phase='test')
         self.logger.info(f'finish evaluation in {time()-self.t0:.3f} sec')
         self.logger.info(f'test loss: {test_loss:.3f}')
-        return {'test_loss':test_loss}, hpix, pred
+        return {'test_loss':test_loss}, hpind, pred
     
 
     def __find_lr(self, best_structure=(4, 20, 18, 1), eta_min=1.0e-5, lr_best=1.0e-3, seed=42):

@@ -252,28 +252,29 @@ def evaluate(model,
     model = model.to(device)
     
     #list_target = []
-    list_hpix = []
+    list_hpind = []
     list_prediction = []
     
     with torch.no_grad():
         model.eval()
         loss = RunningAverage()
-        for (data, target, fpix, hpix) in dataloaders[phase]:
+        for (data, target, fpix, hpind) in dataloaders[phase]:
             data = data.to(device)
             target = target.to(device)
             fpix = fpix.to(device)            
             
-            prediction = model(data) * fpix.unsqueeze(-1)
-            loss.update(criterion(prediction, target).item() * data.size(0), data.size(0))
+            prediction = model(data) 
+            loss.update(criterion(prediction*fpix.unsqueeze(-1), target).item() * data.size(0), 
+                        data.size(0))
 
-            list_hpix.append(hpix)
+            list_hpind.append(hpind)
             list_prediction.append(prediction)
             
-    hpix = torch.cat(list_hpix)
+    hpind = torch.cat(list_hpind)
     pred = torch.cat(list_prediction).squeeze()
     test_loss = loss()
         
-    return test_loss, hpix, pred
+    return test_loss, hpind, pred
 
 
 

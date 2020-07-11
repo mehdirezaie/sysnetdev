@@ -21,6 +21,6 @@ pipeline.run(eta_min=ns.eta_min,
              best_structure=ns.best_structure,
              l1_alpha=ns.l1_alpha,
              savefig=True,
-             seed=2020)
+             seed=42)
 
 # post-process

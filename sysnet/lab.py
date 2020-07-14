@@ -66,37 +66,19 @@ class SYSNet:
             self.rfe_output = self.__run_rfe(self.ns.axes)
         
         if self.ns.do_kfold:
-            output_path_org = self.ns.output_path
-
-            for partition in range(5):
-                key = f'partition_{partition}'
-                self.ns.output_path = output_path_org.replace('.pt', '_%d.pt'%partition)                
-                axes = self.rfe_output[key]['axes_to_keep'] if self.ns.do_rfe else self.ns.axes                
-                structure = (best_structure[0], best_structure[1], len(axes), best_structure[3])
-                
-                self.dataloaders, self.stats = self.ld.load_data(batch_size=self.ns.batch_size,
-                                                                 partition_id=partition,
-                                                                 normalization=self.ns.normalization,
-                                                                 axes=axes,
-                                                                 criterion=self.Cost(**self.cost_kwargs))
-                
-                metrics, hpind, pred = self.__run(eta_min=eta_min,
-                                                lr_best=lr_best,
-                                                best_structure=structure,
-                                                l1_alpha=l1_alpha,
-                                                savefig=savefig,
-                                                seed=seed)
-                
-                self.collector.collect(key, {**metrics, **self.stats}, hpind, pred)
-            self.ns.output_path = output_path_org
-
+            num_partitions = 5
         else:
-            key = 'partition_0'
-            axes = self.rfe_output[key]['axes_to_keep'] if self.ns.do_rfe else self.ns.axes
+            num_partitions = 1
+                        
+        output_path_org = self.ns.output_path
+        for partition in range(num_partitions):
+            key = f'partition_{partition}'
+            self.ns.output_path = output_path_org.replace('.pt', '_%d.pt'%partition)                
+            axes = self.rfe_output[key]['axes_to_keep'] if self.ns.do_rfe else self.ns.axes                
             structure = (best_structure[0], best_structure[1], len(axes), best_structure[3])
-            
+
             self.dataloaders, self.stats = self.ld.load_data(batch_size=self.ns.batch_size,
-                                                             partition_id=0, # only one partition exists
+                                                             partition_id=partition,
                                                              normalization=self.ns.normalization,
                                                              axes=axes,
                                                              criterion=self.Cost(**self.cost_kwargs))
@@ -107,9 +89,10 @@ class SYSNet:
                                             l1_alpha=l1_alpha,
                                             savefig=savefig,
                                             seed=seed)
-            
+
             self.collector.collect(key, {**metrics, **self.stats}, hpind, pred)
             
+        self.ns.output_path = output_path_org            
         self.collector.save(self.ns.output_path.replace('.pt', '.json'), self.ns.nside)
 
         
@@ -204,6 +187,12 @@ class SYSNet:
 
     def __evaluate(self):
         ''' EVALUATE
+        
+        
+        see also
+        --------
+        https://pytorch.org/tutorials/beginner/saving_loading_models.html#saving-loading-model-across-devices
+        
         '''
         model = self.Model(*self.best_structure)
         model.load_state_dict(torch.load(self.ns.output_path))

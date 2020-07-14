@@ -16,10 +16,10 @@ from json import JSONEncoder
 __all__ = ['LoadData', 'check_io', 'SYSNetCollector']
 
 
-def tohp(nside, hpind, values):
+def tohp(nside, hpix, values):
     zeros = np.empty(12*nside*nside, dtype=values.dtype)
     zeros[:] = np.nan 
-    zeros[hpind] = values
+    zeros[hpix] = values
     return zeros
 
 class SYSNetCollector:
@@ -27,24 +27,24 @@ class SYSNetCollector:
     def __init__(self):
         self.metrics = {}
         self.pred = []
-        self.hpind = []
+        self.hpix = []
         
-    def collect(self, key, metrics, hpind, pred):
+    def collect(self, key, metrics, hpix, pred):
         self.metrics[key] = metrics
-        self.hpind.append(hpind)
+        self.hpix.append(hpix)
         self.pred.append(pred)
                 
     def save(self, output_path, nside):
         self.pred = torch.cat(self.pred).numpy()
-        self.hpind = torch.cat(self.hpind).numpy()            
+        self.hpix = torch.cat(self.hpix).numpy()            
         
         with open(output_path, 'w') as output_file:
-            json.dump({'hpind':self.hpind, 
+            json.dump({'hpix':self.hpix, 
                        'pred':self.pred, 
                        'metrics':self.metrics}, 
                       output_file, cls=NumpyArrayEncoder)
             
-        hpmap = tohp(nside, self.hpind, self.pred)
+        hpmap = tohp(nside, self.hpix, self.pred)
         hp.write_map(output_path.replace('.json', f'.hp{nside}.fits'), hpmap, 
                      overwrite=True, dtype=hpmap.dtype)
 
@@ -73,6 +73,7 @@ def check_io(input_path, output_path):
 
     if not output_path.endswith('.pt'):
         raise ValueError(f'{output_path} must end with .pt')
+        
     output_dir = os.path.dirname(output_path)   # check output dir
     if not os.path.exists(output_dir):
         raise RuntimeError(f'{output_dir} does not exist') # fixme: create a dir
@@ -107,7 +108,7 @@ class LoadData:
             return df[0]
     
     def read_fits(self, fits_file):
-        self.df = ft.read(fits_file) # ('label', 'hpind', 'features', 'fracgood')
+        self.df = ft.read(fits_file) # ('label', 'hpix', 'features', 'fracgood')
         if self.do_kfold:
             return self.split2Kfolds(self.df, 
                                      k=5, 
@@ -140,7 +141,7 @@ class LoadData:
         # five partitions (test, training, validation)
         # partition ID -> test, train, val.
 
-        #df = ft.read(fits_file)   # ('label', 'hpind', 'features', 'fracgood')
+        #df = ft.read(fits_file)   # ('label', 'hpix', 'features', 'fracgood')
 
         if self.do_kfold:
             assert -1 < partition_id < 5
@@ -252,7 +253,7 @@ class ImagingData(object):
     def __init__(self, dt, stats=None, add_bias=False, axes=None):
         self.x = dt['features']
         self.y = dt['label']
-        self.p = dt['hpind'].astype('int64')
+        self.p = dt['hpix'].astype('int64')
         self.w = dt['fracgood'].astype('float32')
 
         if stats is not None:
@@ -279,9 +280,9 @@ class MyDataSet(Dataset):
     def __getitem__(self, index):
         data = self.x[index]
         label = self.y[index]
-        hpind = self.p[index]
+        hpix = self.p[index]
         weight = self.w[index]
-        return (data, label, weight, hpind)
+        return (data, label, weight, hpix)
 
     def __len__(self):
         return len(self.x)

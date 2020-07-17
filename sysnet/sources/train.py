@@ -101,7 +101,7 @@ def evaluate(model, loss_fn, dataloader, params, return_ypred=False):
 
         if return_ypred:
             hpix = torch.cat(list_hpix)
-            ypred = torch.cat(list_ypred).squeeze()
+            ypred = torch.cat(list_ypred)#.squeeze()
             ret += (hpix, ypred)
         
     return ret
@@ -115,7 +115,7 @@ def train_and_eval(model, optimizer, loss_fn, dataloaders, params, checkpoint_pa
 
     if (restore_model is not None) & (checkpoint_path is not None): # reload weights
         restore_path = os.path.join(checkpoint_path, restore_model + '.pth.tar')
-        logging.info(f"Restoring parameters from {restore_path}")
+        #logging.info(f"Restoring parameters from {restore_path}")
         checkpoint = load_checkpoint(restore_path, model, optimizer, scheduler)
 
         epoch_first += checkpoint['epoch']
@@ -173,7 +173,7 @@ def train_and_eval(model, optimizer, loss_fn, dataloaders, params, checkpoint_pa
                          'optim_dict': optim_state,
                          'scheduler_dict':scheduler_state},
                           checkpoint=checkpoint_path)       
-        logging.info(f'saved best model at {checkpoint_path}')
+        #logging.info(f'saved best model at {checkpoint_path}')
 
     ret = (best_val_loss, )
     if return_losses:

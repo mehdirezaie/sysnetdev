@@ -64,29 +64,64 @@ class SYSNetCollector:
 
     """    
     def __init__(self):
-        self.metrics = {}
+        self.stats = {}
+        self.losses = {'train':[],
+                       'valid':[],
+                       'test':[]                       
+                        }
         self.pred = []
-        self.hpix = []
+        self.hpix = []        
         self.key = 0
-        
-    def collect(self, metrics, hpix, pred):
-        self.metrics[self.key] = metrics
+
+    def start(self):
+        self.train_losses = []
+        self.valid_losses = []
+        self.test_losses = []
+        self.pred_list = []      
+
+    def collect_chain(self, train_val_losses, test_loss, pred_):
+        self.train_losses.append(train_val_losses[1])
+        self.valid_losses.append(train_val_losses[2])
+        self.test_losses.append(test_loss)
+        self.pred_list.append(pred_)        
+
+    def finish(self, stats, hpix):
+        self.stats[self.key] = stats
         self.hpix.append(hpix)
-        self.pred.append(pred)
+        self.losses['train'].append(self.train_losses)
+        self.losses['valid'].append(self.valid_losses)
+        self.losses['test'].append(self.test_losses)        
+        self.pred.append(torch.cat(self.pred_list, 1))
         self.key += 1
                 
-    def save(self, output_path, nside=None):
-        self.pred = torch.cat(self.pred).numpy()
-        self.hpix = torch.cat(self.hpix).numpy()            
-        
-        with open(output_path, 'w') as output_file:
-            json.dump({'hpix':self.hpix, 
-                       'pred':self.pred, 
-                       'metrics':self.metrics}, 
-                      output_file, cls=NumpyArrayEncoder)
+    def save(self, weights_path, metrics_path, nside=None):
+        """ save metrics and predictions """
+        weights_dir = os.path.dirname(weights_path)
+        if not os.path.exists(weights_dir):
+           os.makedirs(weights_dir)
+
+        metrics_dir = os.path.dirname(metrics_path)
+        if not os.path.exists(metrics_dir):
+           os.makedirs(metrics_dir)
+
+        pred = torch.cat(self.pred, 0).numpy()
+        hpix = torch.cat(self.hpix, 0).numpy()
+        weights = np.zeros(pred.shape[0], dtype=[('hpix', 'i8'), ('weight','f8', (pred.shape[1], ))])
+        weights['hpix'] = hpix
+        weights['weight'] = pred
+
+        ft.write(weights_path, weights, clobber=True)
+        np.savez(metrics_path, stats=self.stats, losses=self.losses)
+
+        # --- MR: how about we save as json? e.g.,
+        # with open(output_path, 'w') as output_file:
+        #     json.dump({'hpix':self.hpix, 
+        #                 'pred':self.pred, 
+        #                 'metrics':self.metrics}, 
+        #                 output_file, cls=NumpyArrayEncoder)
             
-        #hpmap = tohp(nside, self.hpix, self.pred)
-        #hp.write_map(output_path.replace('.json', f'.hp{nside}.fits'), hpmap, 
+        # hpmap = tohp(nside, self.hpix, self.pred)
+        # hp.write_map(output_path.replace('.json', f'.hp{nside}.fits'), hpmap, 
         #             overwrite=True, dtype=hpmap.dtype)
 
 class NumpyArrayEncoder(JSONEncoder):
@@ -286,7 +321,9 @@ class MyDataLoader:
 
 
 class ImagingData(object):
-
+    """ 
+    - currently scales features only
+    """
     def __init__(self, dt, stats=None, add_bias=False, axes=None):
         self.x = dt['features']
         self.y = dt['label']
@@ -294,8 +331,9 @@ class ImagingData(object):
         self.w = dt['fracgood'].astype('float32')
 
         if stats is not None:
+            assert np.all(stats['x'][1] > 0), 'feature with 0 variance detected!'
             self.x = (self.x - stats['x'][0]) / stats['x'][1]
-            #self.y = (self.y - stats['y'][0]) / stats['y'][1]
+            #self.y = (self.y - stats['y'][0]) / stats['y'][1] # don't scale label
             
         if axes is not None:
             self.x = self.x[:, axes]

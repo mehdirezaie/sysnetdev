@@ -1,21 +1,188 @@
-import copy
-import torch
 import os
+import copy
 import logging
 import numpy as np
+
+import torch
 from torch.optim import AdamW
+
 from .callbacks import EarlyStopping
-
-
-__all__ = ['train_val', 'evaluate', 'tune_L1', 'tune_model_structure']
+from .io import save_checkpoint, load_checkpoint
 
 ''' Train DL models
 
 '''
 
+def train(model, optimizer, loss_fn, dataloader, params, epoch, scheduler=None):
+    """
+    Train the model on `num_steps` batches
+    parameters
+    ----------
+    model : (torch.nn.Module) the neural network
+    optimizer : (torch.optim) optimizer for parameters of model
+    loss_fn : a function that takes model output and targets and computes loss
+    dataloader : (DataLoader) a torch.utils.data.DataLoader object fetches training set
+    params : (Params) hyper-parameters
+    epoch : (int) epoch
+    scheduler : (optional) torch.optim.lr_scheduler, e.g., CosineAnnealingWarmRestarts
 
-def add_regularization(model, loss, L1norm=True, L2norm=True,
-                        L1lambda=1.0, L2lambda=1.0):
+    returns
+    -------
+    loss_avg : training loss
+    """
+    #model.to(params['device'])
+    model.train() # set model to training mode    
+    loss_avg = RunningAverage() # running average object for loss
+    num_steps = len(dataloader)
+
+    for i, (data, target, fpix, __) in enumerate(dataloader):
+
+        # move to GPU
+        data = data.to(params['device'])
+        target = target.to(params['device'])
+        fpix = fpix.to(params['device'])
+
+        if scheduler is not None: # e.g., Cosine Annealing
+            scheduler.step(epoch+i/num_steps)
+
+        with torch.set_grad_enabled(True): # only on training phase
+
+            outputs = model(data)*fpix.unsqueeze(-1)
+            loss = loss_fn(outputs, target)
+
+            # FIXME: implement L1 or L2 inside loss
+            # e.g., loss = loss_fn(outputs, target, L1norm, L1lambda, L2norm, L2lambda)
+            #
+            # if L1norm | L2norm:
+            #     loss = add_regularization(
+            #                                 model,
+            #                                 loss,
+            #                                 L1norm=L1norm,
+            #                                 L2norm=L2norm,
+            #                                 L1lambda=L1lambda,
+            #                                 L2lambda=L2lambda
+            #                                 )
+
+            optimizer.zero_grad() # clear previous gradients
+            loss.backward()
+            optimizer.step()
+
+            loss_avg.update(loss.item(), data.size(0))
+        
+    return loss_avg() 
+
+
+def evaluate(model, loss_fn, dataloader, params, return_ypred=False):
+    #model.to(params['device'])
+    model.eval()
+    loss_avg = RunningAverage()
+
+    if return_ypred: # return hpix,ypred for test set
+        list_hpix = []
+        list_ypred = []
+    
+    with torch.no_grad():
+
+        for (data, target, fpix, hpix) in dataloader:
+            data = data.to(params['device'])
+            target = target.to(params['device'])
+            fpix = fpix.to(params['device'])
+            
+            outputs = model(data) 
+            loss = loss_fn(outputs*fpix.unsqueeze(-1), target)
+
+            loss_avg.update(loss.item(), data.size(0))
+
+            if return_ypred:
+                list_hpix.append(hpix)
+                list_ypred.append(outputs)
+        
+        ret = (loss_avg(), )
+
+        if return_ypred:
+            hpix = torch.cat(list_hpix)
+            ypred = torch.cat(list_ypred).squeeze()
+            ret += (hpix, ypred)
+        
+    return ret
+
+
+def train_and_eval(model, optimizer, loss_fn, dataloaders, params, checkpoint_path=None, scheduler=None, restore_model=None, return_losses=False):
+    """
+    Train and evaluate a deep learning model every epoch
+    """
+    epoch_first,  epoch_last = 0, params['nepochs']
+
+    if (restore_model is not None) & (checkpoint_path is not None): # reload weights
+        restore_path = os.path.join(checkpoint_path, restore_model + '.pth.tar')
+        logging.info(f"Restoring parameters from {restore_path}")
+        checkpoint = load_checkpoint(restore_path, model, optimizer, scheduler)
+
+        epoch_first += checkpoint['epoch']
+        epoch_last += checkpoint['epoch']
+
+    model = model.to(params['device'])
+
+    if checkpoint_path is not None:
+        best_epoch = 0
+        best_model_wts = copy.deepcopy(model.state_dict()) # copy `best` model
+        optim_state = copy.deepcopy(optimizer.state_dict())
+        scheduler_state = copy.deepcopy(scheduler.state_dict()) if scheduler is not None else None
+            
+    best_val_loss = 1.0e8 # a very large number
+    train_losses = []     # placeholders for losses
+    valid_losses = []
+
+    #early_stopping = EarlyStopping(patience=10, verbose=True) # callbacks
+
+    for epoch in range(epoch_first, epoch_last): # training loop for `nepochs`
+        msg = f"Epoch {epoch}/{epoch_last-1} "
+        
+        # one full pass over the training set
+        train_loss = train(model, optimizer, loss_fn, dataloaders['train'], params, epoch, scheduler=scheduler)
+        train_losses.append(train_loss)
+        msg += f"train loss: {train_loss:.3f} "
+
+        # one evaluation over the validation set
+        valid_loss, = evaluate(model, loss_fn, dataloaders['valid'], params, return_ypred=False)
+        valid_losses.append(valid_loss)
+        msg += f"valid loss: {valid_loss:.3f} "
+
+        if (valid_loss < best_val_loss):
+            best_val_loss = valid_loss
+            if checkpoint_path is not None:
+                best_epoch = epoch + 1
+                optim_state = copy.deepcopy(optimizer.state_dict())
+                best_model_wts = copy.deepcopy(model.state_dict())
+                scheduler_state = copy.deepcopy(scheduler.state_dict()) if scheduler is not None else None
+
+        if scheduler is not None:
+            msg += f"lr: {scheduler.get_last_lr()[0]:.6f}"
+
+        if params['verbose']:
+            logging.info(msg)
+        # Early stopping
+        # early_stopping(valid_loss)
+        # if early_stopping.early_stop:
+        #    print(f'!--- Early stopping at {epoch:02d}/{nepochs-1:2d} ---!')
+        #    break
+
+    if checkpoint_path is not None: 
+        save_checkpoint({'epoch': best_epoch,
+                         'state_dict': best_model_wts,
+                         'optim_dict': optim_state,
+                         'scheduler_dict':scheduler_state},
+                          checkpoint=checkpoint_path)       
+        logging.info(f'saved best model at {checkpoint_path}')
+
+    ret = (best_val_loss, )
+    if return_losses:
+        ret += (train_losses, valid_losses)
+
+    return ret
+
+
+def add_regularization(model, loss, L1norm=True, L2norm=True, L1lambda=1.0, L2lambda=1.0):
     if L1norm:
         l1_reg = torch.norm(model.fc[0].weight, p=1)
         loss += L1lambda * l1_reg
@@ -36,6 +203,7 @@ def add_regularization(model, loss, L1norm=True, L2norm=True,
 def weight_reset(m):
     if isinstance(m, torch.nn.BatchNorm1d) or isinstance(m, torch.nn.Linear):
         m.reset_parameters()
+
 
 def tune_L1(model,
             dataloaders,
@@ -74,214 +242,28 @@ def tune_L1(model,
     return best_l1lambda
 
 
-def tune_model_structure(DNN,
-                        dataloaders,
-                        datasets_len,
-                        criterion,
-                        nepochs,
-                        device,
-                        structures,
-                        adamw_kw,
-                        seed=42):
-    assert nepochs < 11, 'max nepochs for hyper parameter tunning: 10'
+def tune_model_structure(Model, dataloaders, loss_fn, structures, params):
     history = {
                 'structures' : structures,
                 'best_val_losses':[]
                 }
     for structure in structures:
-        logging.info(f'model with {structure}')
+        model = Model(*structure, seed=params['seed']) # e.g., (3, 20, 18, 1)
+        optimizer = AdamW(params=model.parameters(), **params['adamw_kw'])
 
-        # reset model weights
-        model = DNN(*structure) # e.g., (3, 20, 18, 1)
-
-        optimizer = AdamW(params=model.parameters(), **adamw_kw)
-
-        # call train_val ?
-        _, _, best_val_loss = train_val(
-                                    model=model,
-                                    dataloaders=dataloaders,
-                                    datasets_len=datasets_len,
-                                    criterion=criterion,
-                                    optimizer=optimizer,
-                                    nepochs=nepochs,
-                                    device=device
-                                    )
-
+        best_val_loss, = train_and_eval(model, optimizer, loss_fn, dataloaders, params, return_losses=False)
         history['best_val_losses'].append(best_val_loss)
+        logging.info(f'model with {structure} done')
 
+    #logging.info(f'history: {history}')
     best_structure = history['structures'][np.argmin(history['best_val_losses'])]
     return best_structure
 
 
-
-
-def train_val(model,
-              dataloaders,
-              criterion,
-              optimizer,
-              nepochs,
-              device,
-              output_path=None,
-              scheduler=None,
-              L1lambda=1.0e-3,
-              L2lambda=1.0e-6,
-              L1norm=False,
-              L2norm=False):
-    '''
-    Function trains the DL model, `model`
-
-
-    inputs
-    -------
-    model: module, torch.nn.modules.module.Module
-    dataloaders: dict, of torch.utils.data.dataloader
-    criterion: torch.nn.modules.loss, e.g., MSELoss
-    optimizer: torch.optim.optimizer.Optimizer, e.g., AdamW
-    nepochs: int,
-    output_path: str,
-    device: torch.device, e.g., cuda or cpu
-    scheduler: torch.optim.lr_scheduler, e.g., CosineAnnealingWarmRestarts
-
-
-    outputs
-    --------
-    train_losses: list,
-    valid_losses: list,
-    '''
-    model = model.to(device)
-    if output_path is not None:
-        output_dir = os.path.dirname(output_path)   # check output dir
-        if not os.path.exists(output_dir):
-            raise RuntimeError(f'{output_dir} does not exist')
-
-    train_losses = [] # placeholders for losses
-    valid_losses = []
-    if output_path is not None:
-        best_model_wts = copy.deepcopy(model.state_dict()) # `best` model
-    best_val_loss = 1.0e6 # a very large number
-
-    #--- callbacks ---
-    #early_stopping = EarlyStopping(patience=10, verbose=True)
-
-    #--- training loop `nepochs` ---
-    num_iter = len(dataloaders['train']) # number of training updates
-    for epoch in range(nepochs):
-        running_train_loss = RunningAverage()
-        running_valid_loss = RunningAverage()
-        msg = f'Epoch {epoch}/{nepochs-1} '
-        
-        for phase in ['train', 'valid']:
-            if phase=='train':
-                model.train()
-
-                i = 0
-                for (data, target, fpix, _) in dataloaders[phase]: # training update
-                    data = data.to(device)
-                    target = target.to(device)
-                    fpix = fpix.to(device)
-                    
-                    if scheduler is not None:
-                        scheduler.step(epoch+i/num_iter)
-                        i+=1
-                    optimizer.zero_grad()
-
-                    # only on training phase
-                    with torch.set_grad_enabled(phase == 'train'):
-                        outputs = model(data)*fpix.unsqueeze(-1)
-                        loss = criterion(outputs, target)
-
-                        if L1norm | L2norm:
-                            loss = add_regularization(
-                                                      model,
-                                                      loss,
-                                                      L1norm=L1norm,
-                                                      L2norm=L2norm,
-                                                      L1lambda=L1lambda,
-                                                      L2lambda=L2lambda
-                                                      )
-
-                    loss.backward()
-                    optimizer.step()
-                    running_train_loss.update(loss.item()* data.size(0), data.size(0))
-
-                loss_train_epoch = running_train_loss()
-                train_losses.append(loss_train_epoch)
-                msg += f'{phase} loss: {loss_train_epoch:.3f} '
-            else:
-                with torch.no_grad():
-                    model.eval()
-                    for (data, target, fpix, _) in dataloaders[phase]: # validation set
-                        data = data.to(device)
-                        target = target.to(device)
-                        fpix = fpix.to(device)
-                        
-                        outputs = model(data)*fpix.unsqueeze(-1)
-                        loss = criterion(outputs, target)
-                        running_valid_loss.update(loss.item()* data.size(0), data.size(0))
-
-                    loss_valid_epoch = running_valid_loss()
-                    valid_losses.append(loss_valid_epoch)
-                    msg += f'{phase} loss: {loss_valid_epoch:.3f} '
-                    if (loss_valid_epoch < best_val_loss):
-                        best_val_loss = loss_valid_epoch
-                        if output_path is not None:
-                            best_model_wts = copy.deepcopy(model.state_dict())
-
-        if scheduler is not None:
-            msg += f'lr: {scheduler.get_last_lr()[0]:.6f}' # or {scheduler.get_lr()[0]:.6f}
-
-        logging.info(msg)
-        # Early stopping
-        # early_stopping(loss_valid_epoch)
-        # if early_stopping.early_stop:
-        #    print(f'!--- Early stopping at {epoch:02d}/{nepochs-1:2d} ---!')
-        #    break
-
-    if output_path is not None:
-        if os.path.exists(output_path):
-            raise RuntimeError(f'{output_path} already exists!')
-        torch.save(best_model_wts, output_path)
-        logging.info(f'save model at {output_path}')
-    return train_losses, valid_losses, best_val_loss
-
-
-def evaluate(model,
-            dataloaders,
-            criterion,
-            device,
-            phase='test'):
-    # should I 
-    model = model.to(device)
-    
-    #list_target = []
-    list_hpix = []
-    list_prediction = []
-    
-    with torch.no_grad():
-        model.eval()
-        loss = RunningAverage()
-        for (data, target, fpix, hpix) in dataloaders[phase]:
-            data = data.to(device)
-            target = target.to(device)
-            fpix = fpix.to(device)            
-            
-            prediction = model(data) 
-            loss.update(criterion(prediction*fpix.unsqueeze(-1), target).item() * data.size(0), 
-                        data.size(0))
-
-            list_hpix.append(hpix)
-            list_prediction.append(prediction)
-            
-    hpix = torch.cat(list_hpix)
-    pred = torch.cat(list_prediction).squeeze()
-    test_loss = loss()
-        
-    return test_loss, hpix, pred
-
-
-
-class RunningAverage():
-    """A simple class that maintains the running average of a quantity
+class RunningAverage(object):
+    """
+    A simple class that maintains the running average of a quantity
+    credit: https://github.com/cs230-stanford
     
     Example:
     ```
@@ -295,8 +277,8 @@ class RunningAverage():
         self.steps = 0
         self.total = 0
     
-    def update(self, val, step):
-        self.total += val
+    def update(self, value, step=1):
+        self.total += value
         self.steps += step
     
     def __call__(self):

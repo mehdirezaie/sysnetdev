@@ -1,26 +1,29 @@
 #!/usr/bin/env python
+
+"""
+    TODO:
+        - Check the ratio of the training loss to the baseline loss for the MSE and Poisson cost func.
+        - Save Hyper-parameters in case we don't want to do hp training again?
+        - Add a yaml file to use for the inputs, useful for scaling to 1k mocks
+        - with feature selection the shape of the input layer is different, the model cannot be restored
+"""
 import os
 import sys
 import argparse
 
 import sysnet
 
-#torch.autograd.set_detect_anomaly(True)
+import torch
+torch.autograd.set_detect_anomaly(True) # check 
 
 ap = argparse.ArgumentParser()
-ns = sysnet.parse_cmd_arguments(ap)    
+config = sysnet.parse_cmd_arguments(ap)  # read input parameters from the command line
 
 
-# preprocess    
+# preprocess (read data, randoms, & templates, prepare tabulated data for training)
 
-# feature selection and regression
-pipeline = sysnet.SYSNet(ns)
-pipeline.load()
-pipeline.run(eta_min=ns.eta_min,
-             lr_best=ns.lr_best,
-             best_structure=ns.best_structure,
-             l1_alpha=ns.l1_alpha,
-             savefig=True,
-             seed=42)
+# modeling (feature selection and regression
+pipeline = sysnet.SYSNet(config)
+pipeline.run()
 
-# post-process
+# post-process (assignment to data and reassignment z-related attrs to randoms)

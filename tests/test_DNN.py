@@ -1,4 +1,4 @@
-from sysnet.sources.models import DNN
+from sysnet.sources.models import DNN, DNNPoisson
 from torch import Tensor
 from torch.autograd import Variable
 
@@ -8,7 +8,7 @@ msg = 'Test Deep Neural Network\n'
 msg += f'PyTorch: {torch.__version__}\n'
 print(msg)
 
-a = DNN(3, 100, 500, 500)
+a = DNNPoisson(3, 100, 500, 500)
 
 input = Variable(Tensor(10, 500))
 output = a(input)

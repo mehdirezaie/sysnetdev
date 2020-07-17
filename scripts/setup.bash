@@ -1,2 +1,2 @@
 # 
-export PYTHONPATH=${HOME}/github/pipeline:$PYTHONPATH
+export PYTHONPATH=${HOME}/github/sysnetdev:$PYTHONPATH

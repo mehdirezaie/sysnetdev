@@ -8,9 +8,9 @@ __all__ = ['init_loss']
 def init_loss(metric):
     metric = metric.lower()
     if metric=='mse':
-        return MSELoss, {'reduction':'mean'}
+        return MSELoss, {'reduction':'sum'}
     elif metric=='pnll':
-        return PoissonNLLLoss, {'log_input':False}
+        return PoissonNLLLoss, {'log_input':False, 'reduction':'sum'}
     else:
         raise NotImplementedError(f'{metric} not implemented')
 

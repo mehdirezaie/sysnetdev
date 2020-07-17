@@ -1,41 +1,128 @@
 ''' I/O utils
 '''
 import os
-import torch
-import fitsio as ft
-import numpy as np
 import logging
-from sklearn.model_selection import train_test_split, KFold
-from torch.utils.data import Dataset, DataLoader
-
 import json
 from json import JSONEncoder
 
 
-__all__ = ['LoadData', 'check_io', 'SYSNetCollector']
+import torch
+from torch.utils.data import Dataset, DataLoader
+
+import fitsio as ft
+import numpy as np
+import healpy as hp
+
+from sklearn.model_selection import train_test_split, KFold
+
+
+
+
+def tohp(nside, hpix, values):
+    zeros = np.empty(12*nside*nside, dtype=values.dtype)
+    zeros[:] = np.nan 
+    zeros[hpix] = values
+    return zeros
+
+
+def save_checkpoint(state, checkpoint):
+    """Saves model and training parameters at checkpoint + 'best.pth.tar'.
+    Args:
+        state: (dict) contains model's state_dict, may contain other keys such as epoch, optimizer state_dict
+        checkpoint: (string) folder where parameters are to be saved
+    """
+    filepath = os.path.join(checkpoint, 'best.pth.tar')
+    if not os.path.exists(checkpoint):os.mkdir(checkpoint)
+    torch.save(state, filepath)
+
+
+def load_checkpoint(checkpoint, model, optimizer=None, scheduler=None):
+    """Loads model parameters (state_dict) from file_path. If optimizer is provided, loads state_dict of
+    optimizer assuming it is present in checkpoint.
+    Args:
+        checkpoint: (string) filename which needs to be loaded
+        model: (torch.nn.Module) model for which the parameters are loaded
+        optimizer: (torch.optim) optional: resume optimizer from checkpoint
+        scheduler: 
+    """
+    if not os.path.exists(checkpoint):raise RuntimeError(f"File doesn't exist {checkpoint}")
+    checkpoint = torch.load(checkpoint)
+    model.load_state_dict(checkpoint['state_dict'])
+
+    if optimizer:    
+        optimizer.load_state_dict(checkpoint['optim_dict'])
+
+    if scheduler:
+        scheduler.load_state_dict(checkpoint['scheduler_dict'])
+
+    return checkpoint
+
 
 class SYSNetCollector:
-    
-    def __init__(self):
-        self.metrics = {}
-        self.pred = []
-        self.hpix = []
-        
-    def collect(self, key, metrics, hpix, pred):
-        self.metrics[key] = metrics
-        self.hpix.append(hpix)
-        self.pred.append(pred)
-                
-    def save(self, output_path):
-        self.pred = torch.cat(self.pred).numpy()
-        self.hpix = torch.cat(self.hpix).numpy()            
-        
-        with open(output_path, 'w') as output_file:
-            json.dump({'hpix':self.hpix, 
-                       'pred':self.pred, 
-                       'metrics':self.metrics}, 
-                      output_file, cls=NumpyArrayEncoder)
+    """
+    Collects results
 
+    """    
+    def __init__(self):
+        self.stats = {}
+        self.losses = {'train':[],
+                       'valid':[],
+                       'test':[]                       
+                        }
+        self.pred = []
+        self.hpix = []        
+        self.key = 0
+
+    def start(self):
+        self.train_losses = []
+        self.valid_losses = []
+        self.test_losses = []
+        self.pred_list = []      
+
+    def collect_chain(self, train_val_losses, test_loss, pred_):
+        self.train_losses.append(train_val_losses[1])
+        self.valid_losses.append(train_val_losses[2])
+        self.test_losses.append(test_loss)
+        self.pred_list.append(pred_)        
+
+    def finish(self, stats, hpix):
+        self.stats[self.key] = stats
+        self.hpix.append(hpix)
+        self.losses['train'].append(self.train_losses)
+        self.losses['valid'].append(self.valid_losses)
+        self.losses['test'].append(self.test_losses)        
+        self.pred.append(torch.cat(self.pred_list, 1))
+        self.key += 1
+                
+    def save(self, weights_path, metrics_path, nside=None):
+        """ save metrics and predictions """
+        weights_dir = os.path.dirname(weights_path)
+        if not os.path.exists(weights_dir):
+           os.makedirs(weights_dir)
+
+        metrics_dir = os.path.dirname(metrics_path)
+        if not os.path.exists(metrics_dir):
+           os.makedirs(metrics_dir)
+
+        pred = torch.cat(self.pred, 0).numpy()
+        hpix = torch.cat(self.hpix, 0).numpy()
+        weights = np.zeros(pred.shape[0], dtype=[('hpix', 'i8'), ('weight','f8', (pred.shape[1], ))])
+        weights['hpix'] = hpix
+        weights['weight'] = pred
+
+        ft.write(weights_path, weights, clobber=True)
+        np.savez(metrics_path, stats=self.stats, losses=self.losses)
+
+        # --- MR: how about we save as json? e.g.,
+        # with open(output_path, 'w') as output_file:
+        #     json.dump({'hpix':self.hpix, 
+        #                 'pred':self.pred, 
+        #                 'metrics':self.metrics}, 
+        #                 output_file, cls=NumpyArrayEncoder)
+            
+        # hpmap = tohp(nside, self.hpix, self.pred)
+        # hp.write_map(output_path.replace('.json', f'.hp{nside}.fits'), hpmap, 
+        #             overwrite=True, dtype=hpmap.dtype)
 
 class NumpyArrayEncoder(JSONEncoder):
     # https://pynative.com/python-serialize-numpy-ndarray-into-json/
@@ -43,7 +130,7 @@ class NumpyArrayEncoder(JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return JSONEncoder.default(self, obj)
-    
+
 
 def check_io(input_path, output_path):
     """ checks the paths to input and output
@@ -60,54 +147,29 @@ def check_io(input_path, output_path):
     if os.path.exists(output_path):
         raise RuntimeError(f'{output_path} already exists!')
 
+    #if not output_path.endswith('.pt'):
+    #    raise ValueError(f'{output_path} must end with .pt')
+        
     output_dir = os.path.dirname(output_path)   # check output dir
     if not os.path.exists(output_dir):
         raise RuntimeError(f'{output_dir} does not exist') # fixme: create a dir
 
 
-
-class LoadData:
+class MyDataLoader:
     
     logger = logging.getLogger()
-    def __init__(self, input_file, do_kfold=False, random_seed=42):
-        self.random_seed = random_seed
+    def __init__(self, input_file, do_kfold=False, seed=42):
+        self.seed = seed
         self.do_kfold = do_kfold
         
         if input_file.endswith('.fits'):            
-            self.df_split = self.read_fits(input_file)
+            self.df_split = self.__read_fits(input_file)
         elif input_file.endswith('.npy'):
-            self.df_split = self.read_npy(input_file)
-            
-                
-    def read_npy(self, npy_file):
-        ''' old npy file
-        '''
-        df_raw = np.load(npy_file, allow_pickle=True).item()
-        df = {}
-        for i in range(5):
-            df[i] = (df_raw['train']['fold%d'%i], 
-                     df_raw['validation']['fold%d'%i], 
-                     df_raw['test']['fold%d'%i])
-        if self.do_kfold:
-            return df
-        else:
-            return df[0]
-    
-    def read_fits(self, fits_file):
-        self.df = ft.read(fits_file) # ('label', 'hpind', 'features', 'fracgood')
-        if self.do_kfold:
-            return self.split2Kfolds(self.df, 
-                                     k=5, 
-                                     shuffle=True,
-                                     random_seed=self.random_seed)
-        else:
-            return self.split(self.df)  # 5-fold     
+            self.df_split = self.__read_npy(input_file)
         
-        
-
     def load_data(self, batch_size=1024,
                   partition_id=0, normalization='z-score',
-                  add_bias=False, axes=None, criterion=None):
+                  add_bias=False, axes=None, loss_fn=None):
         '''
         This function loads the data generators from a fits file.
 
@@ -127,7 +189,7 @@ class LoadData:
         # five partitions (test, training, validation)
         # partition ID -> test, train, val.
 
-        #df = ft.read(fits_file)   # ('label', 'hpind', 'features', 'fracgood')
+        #df = ft.read(fits_file)   # ('label', 'hpix', 'features', 'fracgood')
 
         if self.do_kfold:
             assert -1 < partition_id < 5
@@ -157,16 +219,16 @@ class LoadData:
         valid = ImagingData(valid, stats, add_bias=add_bias, axes=axes)
         test = ImagingData(test, stats, add_bias=add_bias, axes=axes)
         
-        if criterion is not None:        
+        if loss_fn is not None:        
             train_ymean = torch.from_numpy(train.y).mean()
             # eq: np.var(train.y) if MSE
             
-            baseline_losses = {'base_train_loss':criterion(train_ymean.expand(train.y.size), 
-                                                               torch.from_numpy(train.y)).item(),
-                               'base_val_loss':criterion(train_ymean.expand(valid.y.size), 
-                                                               torch.from_numpy(valid.y)).item(),
-                               'base_test_loss':criterion(train_ymean.expand(test.y.size), 
-                                                              torch.from_numpy(test.y)).item()}
+            baseline_losses = {'base_train_loss':loss_fn(train_ymean.expand(train.y.size), 
+                                                               torch.from_numpy(train.y)).item()/train.y.size,
+                               'base_val_loss':loss_fn(train_ymean.expand(valid.y.size), 
+                                                               torch.from_numpy(valid.y)).item()/valid.y.size,
+                               'base_test_loss':loss_fn(train_ymean.expand(test.y.size), 
+                                                              torch.from_numpy(test.y)).item()/test.y.size}
             for s in baseline_losses:
                 self.logger.info(f'{s}: {baseline_losses[s]:.3f}') 
                 
@@ -190,9 +252,32 @@ class LoadData:
                                         for s in ['train', 'valid', 'test']
                           }
             return dataloaders, stats
-        
+                       
+    def __read_npy(self, npy_file):
+        ''' old npy file i.e., already split into 5 folds
+        '''
+        df_raw = np.load(npy_file, allow_pickle=True).item()
+        df = {}
+        for i in range(5):
+            df[i] = (df_raw['train']['fold%d'%i], 
+                     df_raw['validation']['fold%d'%i], 
+                     df_raw['test']['fold%d'%i])
+        if self.do_kfold:
+            return df
+        else:
+            return df[0]
+    
+    def __read_fits(self, fits_file):
+        self.df = ft.read(fits_file) # ('label', 'hpix', 'features', 'fracgood')
+        if self.do_kfold:
+            return self.__split2Kfolds(self.df, 
+                                     k=5, 
+                                     shuffle=True,
+                                     seed=self.seed)
+        else:
+            return self.__split(self.df, seed=self.seed)  # 5-fold     
 
-    def split2Kfolds(self, data, k=5, shuffle=True, random_seed=42):
+    def __split2Kfolds(self, data, k=5, shuffle=True, seed=42):
         '''
             split data into k randomly chosen regions
             for training, validation and testing
@@ -206,8 +291,8 @@ class LoadData:
             |
             |__ 1
         '''
-        np.random.seed(random_seed)
-        kfold = KFold(k, shuffle=shuffle, random_state=random_seed)
+        np.random.seed(seed)
+        kfold = KFold(k, shuffle=shuffle, random_state=seed)
         index = np.arange(data.size)
         kfold_data = {
                       0:{},
@@ -229,22 +314,26 @@ class LoadData:
             kfold_data[i] = (data[trainID], data[validID], data[testID])
         return kfold_data
 
-    def split(self, df, seed=42):
+    def __split(self, df, seed=42):
         train, test = train_test_split(df, test_size=0.2, random_state=seed)
         train, valid = train_test_split(train, test_size=0.25, random_state=seed)
         return train, valid, test
 
-class ImagingData(object):
 
+class ImagingData(object):
+    """ 
+    - currently scales features only
+    """
     def __init__(self, dt, stats=None, add_bias=False, axes=None):
         self.x = dt['features']
         self.y = dt['label']
-        self.p = dt['hpind'].astype('int64')
+        self.p = dt['hpix'].astype('int64')
         self.w = dt['fracgood'].astype('float32')
 
         if stats is not None:
+            assert np.all(stats['x'][1] > 0), 'feature with 0 variance detected!'
             self.x = (self.x - stats['x'][0]) / stats['x'][1]
-            #self.y = (self.y - stats['y'][0]) / stats['y'][1]
+            #self.y = (self.y - stats['y'][0]) / stats['y'][1] # don't scale label
             
         if axes is not None:
             self.x = self.x[:, axes]

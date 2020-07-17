@@ -4,20 +4,20 @@ __all__ = ['parse_cmd_arguments']
 def parse_cmd_arguments(parser):
     ''' command argument parser
     '''
-    parser.add_argument('-d', '--data',
-                        type=str,
-                        default='../input/eBOSS_QSO_full_NGC_v7_2.dat.fits',
-                        help='path to the input data catalog')
+    # parser.add_argument('-d', '--data',
+    #                     type=str,
+    #                     default='../input/eBOSS_QSO_full_NGC_v7_2.dat.fits',
+    #                     help='path to the input data catalog')
     
-    parser.add_argument('-r', '--randoms',
-                        type=str,
-                        default='../input/eBOSS_QSO_full_NGC_v7_2.ran.fits',
-                        help='path to the input random catalogs')
+    # parser.add_argument('-r', '--randoms',
+    #                     type=str,
+    #                     default='../input/eBOSS_QSO_full_NGC_v7_2.ran.fits',
+    #                     help='path to the input random catalogs')
     
-    parser.add_argument('-t', '--templates',
-                        type=str,
-                        default='../input/SDSS_WISE_HI_imageprop_nside512.h5',
-                        help='path to the input random catalogs')
+    # parser.add_argument('-t', '--templates',
+    #                     type=str,
+    #                     default='../input/SDSS_WISE_HI_imageprop_nside512.h5',
+    #                     help='path to the input random catalogs')
     
     parser.add_argument('-i', '--input_path',
                         type=str,
@@ -26,8 +26,13 @@ def parse_cmd_arguments(parser):
 
     parser.add_argument('-o', '--output_path',
                         type=str,
-                        default='../output/model_test.pt',
+                        default='../output/model_test',
                         help='path to the output')
+                        
+    parser.add_argument('--restore_model',
+                        type=str,
+                        default=None,
+                        help='model to restore the weights from')
 
     parser.add_argument('-bs', '--batch_size',
                         type=int,
@@ -38,6 +43,11 @@ def parse_cmd_arguments(parser):
                         type=int,
                         default=1,
                         help='number of training epochs')
+
+    parser.add_argument('-nc', '--nchains',
+                        type=int,
+                        default=1,
+                        help='number of chains with different initializations')
 
     parser.add_argument('-fl', '--find_lr',
                         default=False,
@@ -63,12 +73,7 @@ def parse_cmd_arguments(parser):
                         type=str,
                         default='z-score',
                         help='standardization method')
-    
-    parser.add_argument('--loss',
-                        type=str,
-                        default='mse',
-                        help='Cost function (loss) e.g., mse, npll')  
-    
+        
     parser.add_argument('--model',
                         type=str,
                         default='dnn',
@@ -90,31 +95,36 @@ def parse_cmd_arguments(parser):
                         default=1.0e-5,
                         help='min eta for LR finder')
     
-    parser.add_argument('--lr_best',
+    parser.add_argument('-lr', '--learning_rate',
                         type=float,
                         default=1.0e-3,
                         help='best initial learning rate')
 
-    parser.add_argument('--best_structure',
+    parser.add_argument('--nn_structure',
                         type=int,
-                        default=(4, 20, 18, 1),
+                        default=(4, 20),
                         nargs='*',
-                        help='structure ( # hidden layer, # neurons, # features, 1 )')
+                        help='structure ( # hidden layer, # neurons)')
     
     parser.add_argument('--l1_alpha',
                         type=float,
                         default=1.0e-3,
                         help='L1 scale')
     
-    parser.add_argument('-z', '--zbins',
-                        type=float,
-                        nargs='*',
-                        default=[0.8, 2.2, 3.5],
-                        help='redshift bin edges')
+    # parser.add_argument('-z', '--zbins',
+    #                     type=float,
+    #                     nargs='*',
+    #                     default=[0.8, 2.2, 3.5],
+    #                     help='redshift bin edges')
     
-    parser.add_argument('--nside', 
-                        type=int,
-                        default=512,
-                        help='minibatch size')    
+    # parser.add_argument('--nside', 
+    #                     type=int,
+    #                     default=512,
+    #                     help='HEALPix nside')    
+
+    parser.add_argument('--loss',
+                        type=str,
+                        default='mse',
+                        help='Cost function (loss) e.g., mse, pnll')  
 
     return parser.parse_args()

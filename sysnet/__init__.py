@@ -1,3 +1,3 @@
 
-from .lab import *
-from .args import *
+from .lab import SYSNet
+from .cli import parse_cmd_arguments

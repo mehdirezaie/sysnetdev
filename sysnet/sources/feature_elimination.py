@@ -22,7 +22,9 @@ class FeatureElimination:
     def run(self, axes):
         
         # compute with all axes once
-        self.results['val_loss_baseline'] = self.train_eval(axes)         
+        val_loss_baseline = self.train_eval(axes)
+        self.logger.info(f"all attributes with {val_loss_baseline:.6f}")
+        self.results['val_loss_baseline'] = val_loss_baseline
         self.__run(axes.copy())
         self.__sort()        
         
@@ -41,7 +43,7 @@ class FeatureElimination:
 
         arg = np.argmin(val_loss)
 
-        self.logger.info(f'attribute index-{axes[arg]} with {val_loss[arg]:.3f}')
+        self.logger.info(f'attribute index-{axes[arg]} with {val_loss[arg]:.6f}')
         self.results['val_loss'].append(val_loss)
         self.results['axes'].append(axes.copy())
         self.results['importance'].append(axes.pop(arg))

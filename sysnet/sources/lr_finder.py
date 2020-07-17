@@ -26,6 +26,9 @@ import copy
 import os
 import torch
 from torch.optim.lr_scheduler import _LRScheduler
+
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 
 try:
@@ -333,7 +336,7 @@ class LRFinder(object):
 
         return running_loss / len(dataloader.dataset)
 
-    def plot(self, skip_start=10, skip_end=5, log_lr=True, show_lr=None, ax=None):
+    def plot(self, skip_start=10, skip_end=5, log_lr=True, show_lr=None, lrfig_path=None):
         """Plots the learning rate range test.
 
         Arguments:
@@ -373,9 +376,7 @@ class LRFinder(object):
             losses = losses[skip_start:-skip_end]
 
         # Create the figure and axes object if axes was not already given
-        fig = None
-        if ax is None:
-            fig, ax = plt.subplots()
+        fig, ax = plt.subplots()
 
         # Plot loss as a function of the learning rate
         ax.plot(lrs, losses)
@@ -387,10 +388,9 @@ class LRFinder(object):
         if show_lr is not None:
             ax.axvline(x=show_lr, color="red")
 
-        # Show only if the figure was created internally
-        if fig is not None:
-            plt.show()
-
+        if lrfig_path:
+            fig.savefig(lrfig_path, bbox_inches='tight')
+            
         return ax
 
 

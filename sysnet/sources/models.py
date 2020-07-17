@@ -9,7 +9,19 @@ import numpy as np
 
 import logging
 
-__all__ = ['DNN', 'LinearRegression', 'LinearNet', 'DNNPoisson']
+__all__ = ['DNN', 'LinearRegression', 'LinearNet', 'DNNPoisson', 'init_model']
+
+
+def init_model(model):
+    if model=='dnn':
+        return DNN
+    elif model=='dnnp':
+        return DNNPoisson
+    else:
+        raise NotImplementedError(f'Model {model} is not implemented!')
+
+    
+
 
 
 class DNN(nn.Module):
@@ -70,6 +82,7 @@ class DNNPoisson(DNN):
         super(DNNPoisson, self).__init__(nb_layers, nb_units, 
                                          input_dim=input_dim, output_dim=output_dim,
                                          seed=seed)
+        print(f'set seed to {seed}')
 
     def forward(self, x):
         for i in range(self.nb_layers):

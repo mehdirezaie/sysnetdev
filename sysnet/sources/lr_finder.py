@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
+import matplotlib.pyplot as plt
 import copy
 import os
 import torch
@@ -29,7 +30,6 @@ from torch.optim.lr_scheduler import _LRScheduler
 
 import matplotlib as mpl
 mpl.use('Agg')
-import matplotlib.pyplot as plt
 
 try:
     from apex import amp
@@ -38,19 +38,17 @@ try:
 except ImportError:
     #import logging
 
-    #logging.basicConfig()
+    # logging.basicConfig()
     #logger = logging.getLogger(__name__)
-    #logger.warning(
+    # logger.warning(
     #    "To enable mixed precision training, please install `apex`. "
     #    "Or you can re-install this package by the following command:\n"
     #    '  pip install torch-lr-finder -v --global-option="amp"'
-    #)
+    # )
     IS_AMP_AVAILABLE = False
     #del logging
 
 __all__ = ['LRFinder']
-
-
 
 
 class LRFinder(object):
@@ -207,7 +205,8 @@ class LRFinder(object):
         elif step_mode.lower() == "linear":
             lr_schedule = LinearLR(self.optimizer, end_lr, num_iter)
         else:
-            raise ValueError("expected one of (exp, linear), got {}".format(step_mode))
+            raise ValueError(
+                "expected one of (exp, linear), got {}".format(step_mode))
 
         if smooth_f < 0 or smooth_f >= 1:
             raise ValueError("smooth_f is outside the range [0, 1]")
@@ -229,7 +228,8 @@ class LRFinder(object):
                 self.best_loss = loss
             else:
                 if smooth_f > 0:
-                    loss = smooth_f * loss + (1 - smooth_f) * self.history["loss"][-1]
+                    loss = smooth_f * loss + \
+                        (1 - smooth_f) * self.history["loss"][-1]
                 if loss < self.best_loss:
                     self.best_loss = loss
 
@@ -239,10 +239,12 @@ class LRFinder(object):
                 print("Stopping early, the loss has diverged")
                 break
 
-        print("Learning rate search finished. See the graph with {finder_name}.plot()")
+        print(
+            "Learning rate search finished. See the graph with {finder_name}.plot()")
 
     def _get_best_lr(self):
-        pass 
+        pass
+
     def _set_learning_rate(self, new_lrs):
         if not isinstance(new_lrs, list):
             new_lrs = [new_lrs] * len(self.optimizer.param_groups)
@@ -258,7 +260,8 @@ class LRFinder(object):
     def _check_for_scheduler(self):
         for param_group in self.optimizer.param_groups:
             if "initial_lr" in param_group:
-                raise RuntimeError("Optimizer already has a scheduler attached to it")
+                raise RuntimeError(
+                    "Optimizer already has a scheduler attached to it")
 
     def _train_batch(self, iter_wrapper, accumulation_steps):
         self.model.train()
@@ -390,7 +393,7 @@ class LRFinder(object):
 
         if lrfig_path:
             fig.savefig(lrfig_path, bbox_inches='tight')
-            
+
         return ax
 
 
@@ -457,7 +460,8 @@ class StateCacher(object):
         if self.in_memory:
             self.cached.update({key: copy.deepcopy(state_dict)})
         else:
-            fn = os.path.join(self.cache_dir, "state_{}_{}.pt".format(key, id(self)))
+            fn = os.path.join(
+                self.cache_dir, "state_{}_{}.pt".format(key, id(self)))
             self.cached.update({key: fn})
             torch.save(state_dict, fn)
 
@@ -471,9 +475,11 @@ class StateCacher(object):
             fn = self.cached.get(key)
             if not os.path.exists(fn):
                 raise RuntimeError(
-                    "Failed to load state in {}. File doesn't exist anymore.".format(fn)
+                    "Failed to load state in {}. File doesn't exist anymore.".format(
+                        fn)
                 )
-            state_dict = torch.load(fn, map_location=lambda storage, location: storage)
+            state_dict = torch.load(
+                fn, map_location=lambda storage, location: storage)
             return state_dict
 
     def __del__(self):

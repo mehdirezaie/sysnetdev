@@ -334,7 +334,11 @@ class ImagingData(object):
     def __init__(self, dt, stats=None, add_bias=False, axes=None):
         self.x = dt['features']
         self.y = dt['label']
-        self.p = dt['hpix'].astype('int64')
+        try:
+            self.p = dt['hpix'].astype('int64')
+        except:
+            self.p = dt['hpind'].astype('int64')
+
         self.w = dt['fracgood'].astype('float32')
 
         if stats is not None:

@@ -157,7 +157,7 @@ class SYSNet:
         self.logger.info('# training and evaluation')
         num_partitions = 5 if self.config.do_kfold else 1
 
-        for partition_id in range(num_partitions):  # k-fold validation loop
+        for partition_id in range(0, num_partitions):  # k-fold validation loop
 
             axes = self.__axes_for_partition(partition_id)
             # (# units, # hidden layers, # input layer units, # output unit)
@@ -358,13 +358,14 @@ class SYSNet:
                       nepochs=__nepochs_hyperparams__,
                       adamw_kw=adamw_kwargs,
                       seed=__global_seed__,
-                      verbose=False,
+                      verbose=True,
                       l1_alpha=self.config.l1_alpha)
 
         num_features, num_output = nn_structure[2], nn_structure[3]
         structures = [(3, 20, num_features, num_output),
                       (4, 20, num_features, num_output),
-                      (5, 20, num_features, num_output)]
+                      (5, 20, num_features, num_output),
+                      (6, 20, num_features, num_output)]
 
         loss_fn = self.Loss(**self.config.loss_kwargs)
         best_structure = src.tune_model_structure(
@@ -470,14 +471,16 @@ class SYSNet:
                       verbose=False,
                       l1_alpha=self.config.l1_alpha)
 
-        l1_alphas = np.logspace(-6, 0, 10)
+        l1_alphas = np.logspace(-8, 1, 10)
 
         model = self.Model(*nn_structure, seed=params['seed'])
         loss_fn = self.Loss(**self.config.loss_kwargs)
         best_l1_alpha = src.tune_l1_scale(
             model, dataloaders, loss_fn, l1_alphas, params)
-        exit(
+        
+        self.logger.info(
             f'found best l1_alpha {best_l1_alpha} in {time()-self.t0:.3f} sec')
+        exit()
 
     # def __find_l1(self, l1_alpha=1.0e-6, seed=42):
     #     if self.config.find_l1:

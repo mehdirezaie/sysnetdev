@@ -50,8 +50,10 @@ def train(model, optimizer, loss_fn, dataloader, params, epoch, scheduler=None):
 
             outputs = model(data)*fpix.unsqueeze(-1)
             loss = loss_fn(outputs, target)
-            l1loss = l1_loss(model)
-            loss += params['l1_alpha']*l1loss
+            
+            if params['l1_alpha'] > 0.0: # do L1 regularization if l1 alpha is positive
+                l1loss = l1_loss(model)
+                loss += params['l1_alpha']*l1loss
 
             optimizer.zero_grad()  # clear previous gradients
             loss.backward()
@@ -260,7 +262,7 @@ def tune_l1_scale(model, dataloaders, loss_fn, l1_alphas, params):
         best_val_loss, = train_and_eval(
             model, optimizer, loss_fn, dataloaders, params_, return_losses=False)
         history['best_val_losses'].append(best_val_loss)
-        logging.info(f'model with {l1_alpha} done')
+        logging.info(f'model with {l1_alpha} done {best_val_loss:.6f}')
 
     #logging.info(f'history: {history}')
     best_l1_alpha = history['l1_alphas'][np.argmin(
@@ -281,7 +283,7 @@ def tune_model_structure(Model, dataloaders, loss_fn, structures, params):
         best_val_loss, = train_and_eval(
             model, optimizer, loss_fn, dataloaders, params, return_losses=False)
         history['best_val_losses'].append(best_val_loss)
-        logging.info(f'model with {structure} done')
+        logging.info(f'model with {structure} done {best_val_loss:.6f}')
 
     #logging.info(f'history: {history}')
     best_structure = history['structures'][np.argmin(

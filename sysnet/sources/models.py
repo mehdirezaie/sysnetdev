@@ -81,7 +81,6 @@ class DNNPoisson(DNN):
         super(DNNPoisson, self).__init__(nb_layers, nb_units,
                                          input_dim=input_dim, output_dim=output_dim,
                                          seed=seed)
-        print(f'set seed to {seed}')
 
     def forward(self, x):
         for i in range(self.nb_layers):

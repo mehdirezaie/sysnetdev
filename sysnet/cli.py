@@ -109,8 +109,9 @@ def parse_cmd_arguments(parser):
 
     parser.add_argument('--l1_alpha',
                         type=float,
-                        default=1.0e-3,
-                        help='L1 scale')
+                        default=1.0e-8,
+                        help='L1 scale (negative value will turn off regularization)')
+
 
     # parser.add_argument('-z', '--zbins',
     #                     type=float,

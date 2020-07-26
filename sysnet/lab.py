@@ -372,6 +372,7 @@ class SYSNet:
             self.Model, dataloaders, loss_fn, structures, params)
         self.logger.info(
             f'found best structure {best_structure} in {time()-self.t0:.3f} sec')
+        exit()
         return best_structure
 
     def __find_lr(self, train_dataloader, nn_structure, partition_id):

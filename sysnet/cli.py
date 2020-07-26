@@ -77,7 +77,7 @@ def parse_cmd_arguments(parser):
 
     parser.add_argument('--model',
                         type=str,
-                        default='dnn',
+                        default='dnnp',
                         help='model, dnn or dnnp')
 
     parser.add_argument('-ax', '--axes',
@@ -109,7 +109,7 @@ def parse_cmd_arguments(parser):
 
     parser.add_argument('--l1_alpha',
                         type=float,
-                        default=1.0e-8,
+                        default=-1.0,
                         help='L1 scale (negative value will turn off regularization)')
 
 
@@ -126,7 +126,7 @@ def parse_cmd_arguments(parser):
 
     parser.add_argument('--loss',
                         type=str,
-                        default='mse',
+                        default='pnll',
                         help='Cost function (loss) e.g., mse, pnll')
 
     return parser.parse_args()

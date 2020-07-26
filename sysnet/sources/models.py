@@ -83,14 +83,16 @@ class DNNPoisson(DNN):
                                          seed=seed)
 
     def forward(self, x):
-        for i in range(self.nb_layers):
-            if i == self.nb_layers-1:
-                x = self.fc[i](x)
-                x = F.softplus(x, threshold=1000)
-            else:
-                x = F.relu(self.fc[i](x))
-                x = self.bn[i](x)
-        return x
+        x = super(DNNPoisson, self).forward(x)
+        return F.softplus(x, threshold=1000)
+        #for i in range(self.nb_layers):
+        #    if i == self.nb_layers-1:
+        #        x = self.fc[i](x)
+        #        x = F.softplus(x, threshold=1000)
+        #    else:
+        #        x = F.relu(self.fc[i](x))
+        #        x = self.bn[i](x)
+        #return x
 
 
 class LinearNet(nn.Module):

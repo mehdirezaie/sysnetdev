@@ -6,6 +6,7 @@
 import numpy as np
 import torch
 
+
 class EarlyStopping:
 
     def __init__(self, patience=7, verbose=False, delta=0):
@@ -30,6 +31,7 @@ class EarlyStopping:
             self.best_score = score
             self.counter = 0
 
+
 class EarlyStoppingOrg:
     """Early stops the training if validation loss
         doesn't improve after a given patience.
@@ -40,6 +42,7 @@ class EarlyStoppingOrg:
         April 19, 2020: comment out checkpoints
 
     """
+
     def __init__(self, patience=7, verbose=False, delta=0):
         """
         Args:
@@ -77,7 +80,7 @@ class EarlyStoppingOrg:
 
     def save_checkpoint(self, val_loss, model):
         '''Saves model when validation loss decrease.'''
-        return # MR: no need to save checkpoints, april 19, 2020
+        return  # MR: no need to save checkpoints, april 19, 2020
 
         if self.verbose:
             print(f'Validation loss decreased ({self.val_loss_min:.6f}'

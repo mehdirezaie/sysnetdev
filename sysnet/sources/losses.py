@@ -1,16 +1,17 @@
 
 import torch
-from torch.nn import MSELoss, PoissonNLLLoss 
+from torch.nn import MSELoss, PoissonNLLLoss
 
 
 __all__ = ['init_loss']
 
+
 def init_loss(metric):
     metric = metric.lower()
-    if metric=='mse':
-        return MSELoss, {'reduction':'sum'}
-    elif metric=='pnll':
-        return PoissonNLLLoss, {'log_input':False, 'reduction':'sum'}
+    if metric == 'mse':
+        return MSELoss, {'reduction': 'sum'}
+    elif metric == 'pnll':
+        return PoissonNLLLoss, {'log_input': False, 'reduction': 'sum'}
     else:
         raise NotImplementedError(f'{metric} not implemented')
 

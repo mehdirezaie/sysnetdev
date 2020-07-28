@@ -1,6 +1,7 @@
 
 __all__ = ['parse_cmd_arguments']
 
+
 def parse_cmd_arguments(parser):
     ''' command argument parser
     '''
@@ -8,17 +9,17 @@ def parse_cmd_arguments(parser):
     #                     type=str,
     #                     default='../input/eBOSS_QSO_full_NGC_v7_2.dat.fits',
     #                     help='path to the input data catalog')
-    
+
     # parser.add_argument('-r', '--randoms',
     #                     type=str,
     #                     default='../input/eBOSS_QSO_full_NGC_v7_2.ran.fits',
     #                     help='path to the input random catalogs')
-    
+
     # parser.add_argument('-t', '--templates',
     #                     type=str,
     #                     default='../input/SDSS_WISE_HI_imageprop_nside512.h5',
     #                     help='path to the input random catalogs')
-    
+
     parser.add_argument('-i', '--input_path',
                         type=str,
                         default='../input/eBOSS.ELG.NGC.DR7.table.fits',
@@ -28,7 +29,7 @@ def parse_cmd_arguments(parser):
                         type=str,
                         default='../output/model_test',
                         help='path to the output')
-                        
+
     parser.add_argument('--restore_model',
                         type=str,
                         default=None,
@@ -62,7 +63,7 @@ def parse_cmd_arguments(parser):
     parser.add_argument('-fl1', '--find_l1',
                         default=False,
                         action='store_true',
-                        help='find the best L1 lambda')
+                        help='find the best L1 alpha')
 
     parser.add_argument('-k', '--do_kfold',
                         default=False,
@@ -73,28 +74,33 @@ def parse_cmd_arguments(parser):
                         type=str,
                         default='z-score',
                         help='standardization method')
-        
+
     parser.add_argument('--model',
                         type=str,
-                        default='dnn',
-                        help='model, dnn or dnnp')      
+                        default='dnnp',
+                        help='model, dnn or dnnp')
     
+    parser.add_argument('--optim',
+                        type=str,
+                        default='adamw',
+                        help='adamw or sgd')
+
     parser.add_argument('-ax', '--axes',
                         type=int,
                         nargs='*',
                         required=True,
                         help='index of features to use')
-    
+
     parser.add_argument('--do_rfe',
                         default=False,
                         action='store_true',
                         help='perform recursive feature elimination')
-    
+
     parser.add_argument('--eta_min',
                         type=float,
                         default=1.0e-5,
                         help='min eta for LR finder')
-    
+
     parser.add_argument('-lr', '--learning_rate',
                         type=float,
                         default=1.0e-3,
@@ -105,26 +111,27 @@ def parse_cmd_arguments(parser):
                         default=(4, 20),
                         nargs='*',
                         help='structure ( # hidden layer, # neurons)')
-    
+
     parser.add_argument('--l1_alpha',
                         type=float,
-                        default=1.0e-3,
-                        help='L1 scale')
-    
+                        default=-1.0,
+                        help='L1 scale (negative value will turn off regularization)')
+
+
     # parser.add_argument('-z', '--zbins',
     #                     type=float,
     #                     nargs='*',
     #                     default=[0.8, 2.2, 3.5],
     #                     help='redshift bin edges')
-    
-    # parser.add_argument('--nside', 
+
+    # parser.add_argument('--nside',
     #                     type=int,
     #                     default=512,
-    #                     help='HEALPix nside')    
+    #                     help='HEALPix nside')
 
     parser.add_argument('--loss',
                         type=str,
-                        default='mse',
-                        help='Cost function (loss) e.g., mse, pnll')  
+                        default='pnll',
+                        help='Cost function (loss) e.g., mse, pnll')
 
     return parser.parse_args()

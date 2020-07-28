@@ -13,15 +13,12 @@ __all__ = ['DNN', 'LinearRegression', 'LinearNet', 'DNNPoisson', 'init_model']
 
 
 def init_model(model):
-    if model=='dnn':
+    if model == 'dnn':
         return DNN
-    elif model=='dnnp':
+    elif model == 'dnnp':
         return DNNPoisson
     else:
         raise NotImplementedError(f'Model {model} is not implemented!')
-
-    
-
 
 
 class DNN(nn.Module):
@@ -36,23 +33,24 @@ class DNN(nn.Module):
     input = Variable(torch.Tensor(10, 500))
     output = a(input)
     '''
+
     def __init__(self, nb_layers, nb_units, input_dim=18, output_dim=1, seed=42):
         assert nb_layers >= 2
         torch.manual_seed(seed=seed)
         super(DNN, self).__init__()
-        self.fc = nn.ModuleList()#[]
-        self.bn = nn.ModuleList()#[]
+        self.fc = nn.ModuleList()  # []
+        self.bn = nn.ModuleList()  # []
 
         self.nb_layers = nb_layers
         for i in range(nb_layers):
-            if i == 0: # input layer
+            if i == 0:  # input layer
                 self.fc.append(nn.Linear(input_dim, nb_units))
                 self.bn.append(nn.BatchNorm1d(nb_units))
 
-            elif i == nb_layers-1: # output layer
+            elif i == nb_layers-1:  # output layer
                 self.fc.append(nn.Linear(nb_units, output_dim))
 
-            else: # hidden layers
+            else:  # hidden layers
                 self.fc.append(nn.Linear(nb_units, nb_units))
                 self.bn.append(nn.BatchNorm1d(nb_units))
 
@@ -62,9 +60,9 @@ class DNN(nn.Module):
                 x = self.fc[i](x)
             else:
                 x = F.relu(self.fc[i](x))
-                x = self.bn[i](x)                
+                x = self.bn[i](x)
         return x
-    
+
 
 class DNNPoisson(DNN):
     '''
@@ -78,21 +76,24 @@ class DNNPoisson(DNN):
     input = Variable(torch.Tensor(10, 500))
     output = a(input)
     '''
+
     def __init__(self, nb_layers, nb_units, input_dim=18, output_dim=1, seed=42):
-        super(DNNPoisson, self).__init__(nb_layers, nb_units, 
+        super(DNNPoisson, self).__init__(nb_layers, nb_units,
                                          input_dim=input_dim, output_dim=output_dim,
                                          seed=seed)
-        print(f'set seed to {seed}')
 
     def forward(self, x):
-        for i in range(self.nb_layers):
-            if i == self.nb_layers-1:
-                x = self.fc[i](x)
-                x = F.softplus(x, threshold=1000)
-            else:
-                x = F.relu(self.fc[i](x))
-                x = self.bn[i](x)                
-        return x    
+        x = super(DNNPoisson, self).forward(x)
+        return F.softplus(x, threshold=1000)
+        #for i in range(self.nb_layers):
+        #    if i == self.nb_layers-1:
+        #        x = self.fc[i](x)
+        #        x = F.softplus(x, threshold=1000)
+        #    else:
+        #        x = F.relu(self.fc[i](x))
+        #        x = self.bn[i](x)
+        #return x
+
 
 class LinearNet(nn.Module):
 
@@ -103,7 +104,6 @@ class LinearNet(nn.Module):
     def forward(self, x):
         x = self.hl1(x)
         return x
-
 
 
 class LinearRegression:
@@ -127,17 +127,17 @@ class LinearRegression:
         #self.logger.info(f'reduction: {reduction}')
         self.cost = torch.nn.MSELoss(reduction=reduction)
         self.add_bias = add_bias
-        
+
     def fit(self, x, y):
         # check input
         if isinstance(x, np.ndarray):
             x = torch.from_numpy(x)
         if isinstance(y, np.ndarray):
             y = torch.from_numpy(y)
-        
+
         if self.add_bias:
             x = torch.cat((torch.ones(x.shape[0]).unsqueeze(1), x), 1)
-        
+
         # training
         xx = torch.matmul(x.T, x)
         xx_inv = torch.inverse(xx)
@@ -150,8 +150,8 @@ class LinearRegression:
 
     def evaluate(self, x, y, has_bias=False):
         return self.cost(y, self.predict(x, has_bias)).item()
-        
+
     def predict(self, x, has_bias=False):
         if (not has_bias) & self.add_bias:
-            x = torch.cat((torch.ones(x.shape[0]).unsqueeze(1), x), 1)        
+            x = torch.cat((torch.ones(x.shape[0]).unsqueeze(1), x), 1)
         return torch.matmul(x, self.coef_)

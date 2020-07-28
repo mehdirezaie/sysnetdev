@@ -174,7 +174,7 @@ class MyDataLoader:
 
     def load_data(self, batch_size=1024,
                   partition_id=0, normalization='z-score',
-                  add_bias=False, axes=None, loss_fn=None):
+                  add_bias=False, axes=None):
         '''
         This function loads the data generators from a fits file.
 
@@ -223,28 +223,13 @@ class MyDataLoader:
         valid = ImagingData(valid, stats, add_bias=add_bias, axes=axes)
         test = ImagingData(test, stats, add_bias=add_bias, axes=axes)
 
-        if loss_fn is not None:
-            train_ymean = torch.from_numpy(train.y).mean()
-            # eq: np.var(train.y) if MSE
-
-            baseline_losses = {'base_train_loss': loss_fn(train_ymean.expand(train.y.size),
-                                                          torch.from_numpy(train.y)).item()/train.y.size,
-                               'base_val_loss': loss_fn(train_ymean.expand(valid.y.size),
-                                                        torch.from_numpy(valid.y)).item()/valid.y.size,
-                               'base_test_loss': loss_fn(train_ymean.expand(test.y.size),
-                                                         torch.from_numpy(test.y)).item()/test.y.size}
-            for s in baseline_losses:
-                self.logger.info(f'{s}: {baseline_losses[s]:.3f}')
-
-            stats = {**stats, **baseline_losses}
-
         datasets = {
             'train': MyDataSet(train.x, train.y, train.p, train.w),
             'valid': MyDataSet(valid.x, valid.y, valid.p, valid.w),
             'test': MyDataSet(test.x, test.y, test.p, test.w),
         }
 
-        if batch_size == -1:
+        if batch_size==-1:
             return datasets, stats
         else:
             dataloaders = {
@@ -311,12 +296,8 @@ class MyDataLoader:
             validID = np.random.choice(
                 nontestID, size=testID.size, replace=False)
             trainID = np.setdiff1d(nontestID, validID)
-            #
-            #
-            #kfold_data[i]['test'] = data[testID]
-            #kfold_data[i]['train'] = data[trainID]
-            #kfold_data[i]['validation'] = data[validID]
             kfold_data[i] = (data[trainID], data[validID], data[testID])
+            
         return kfold_data
 
     def __split(self, df, seed=42):
@@ -362,7 +343,7 @@ class MyDataSet(Dataset):
         self.x = torch.from_numpy(x)
         self.y = torch.from_numpy(y).unsqueeze(-1)
         self.p = p
-        self.w = w
+        self.w = torch.from_numpy(w).unsqueeze(-1)
 
     def __getitem__(self, index):
         data = self.x[index]

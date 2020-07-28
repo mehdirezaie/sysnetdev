@@ -20,8 +20,6 @@ matplotlib.use('Agg')
 # set some global variables which do not change
 __logger_level__ = 'info'  # info, debug, or warning
 __global_seed__ = 85
-__adamw_kwargs__ = dict(betas=(0.9, 0.999), eps=1e-08,
-                        weight_decay=0.01, amsgrad=False)
 __cosann_warmup_kwargs__ = dict(T_0=10, T_mult=2)
 __nepochs_hyperparams__ = 10
 __seed_max__ = 4294967295  # i.e., 2**32 - 1, maximum number in numpy
@@ -110,6 +108,8 @@ class SYSNet:
         self.Loss, self.config.loss_kwargs = src.init_loss(self.config.loss)
         self.collector = src.SYSNetCollector()
         self.Model = src.init_model(self.config.model)
+        self.Optim, self.config.optim_kwargs = src.init_optim(self.config.optim)
+        
         self.config.device = torch.device(
             "cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -162,22 +162,36 @@ class SYSNet:
             axes = self.__axes_for_partition(partition_id)
             # (# units, # hidden layers, # input layer units, # output unit)
             nn_structure = (*self.config.nn_structure, len(axes), 1)
+            
             self.logger.info(f'partition_{partition_id} with {nn_structure}')
 
             dataloaders, stats = self.ld.load_data(batch_size=self.config.batch_size,
                                                    partition_id=partition_id,
                                                    normalization=self.config.normalization,
-                                                   axes=axes,
-                                                   loss_fn=self.Loss(**self.config.loss_kwargs))  # takes loss_fn for baseline metrics
+                                                   axes=axes)
+            
+            stats = self.__add_base_losses(stats, dataloaders)
 
-            nn_structure = self.__tune_hyperparams(
-                dataloaders, nn_structure, partition_id)  # only once
+            self.__tune_hyperparams(dataloaders, nn_structure, partition_id)
 
             self.__train_and_eval_chains(
                 dataloaders, nn_structure, partition_id, stats)  # for 'nchains' times
 
+        self.logger.info(f'wrote weights: {self.weights_path}')
+        self.logger.info(f'wrote metrics: {self.metrics_path}')
         self.collector.save(self.weights_path, self.metrics_path)
 
+    def __add_base_losses(self, stats, dataloaders):
+        
+        loss_fn = self.Loss(**self.config.loss_kwargs)
+        baseline_losses = src.compute_baseline_losses(dataloaders, loss_fn)
+        
+        for sample, base_loss in baseline_losses.items():
+            self.logger.info(f'{sample}: {base_loss:.3f}')
+            
+        return {**stats, **baseline_losses}
+
+        
     def __train_and_eval_chains(self, dataloaders, nn_structure, partition_id, stats):
         """
         Train and evaluate for 'nchain' times
@@ -242,8 +256,8 @@ class SYSNet:
         lossfig_path = self.lossfig_path_fn(partition_id, seed)
 
         model = self.Model(*nn_structure, seed=seed)
-        adamw_kwargs = dict(lr=self.config.learning_rate, **__adamw_kwargs__)
-        optimizer = src.AdamW(params=model.parameters(), **adamw_kwargs)
+        optim_kwargs = dict(lr=self.config.learning_rate, **self.config.optim_kwargs)
+        optimizer = self.Optim(params=model.parameters(), **optim_kwargs)
         scheduler = src.CosineAnnealingWarmRestarts(
             optimizer, eta_min=self.config.eta_min, **__cosann_warmup_kwargs__)
         loss_fn = self.Loss(**self.config.loss_kwargs)
@@ -325,14 +339,12 @@ class SYSNet:
                 # exit
 
             if self.config.find_structure:
-                nn_structure = self.__find_structure(
-                    dataloaders, nn_structure)  # will update nn_structure
+                self.__find_structure(dataloaders, nn_structure)  
+                # exit
 
             if self.config.find_l1:
                 self.__find_l1alpha(dataloaders, nn_structure)
                 # exit
-
-        return nn_structure
 
     def __find_structure(self, dataloaders, nn_structure):
         """
@@ -353,10 +365,10 @@ class SYSNet:
         """
         self.logger.info('# running nn structure finder ...')
 
-        adamw_kwargs = dict(lr=self.config.learning_rate, **__adamw_kwargs__)
+        optim_kwargs = dict(lr=self.config.learning_rate, **self.config.optim_kwargs)
         params = dict(device=self.config.device,
                       nepochs=__nepochs_hyperparams__,
-                      adamw_kw=adamw_kwargs,
+                      optim_kw=optim_kwargs,
                       seed=__global_seed__,
                       verbose=True,
                       l1_alpha=self.config.l1_alpha)
@@ -369,11 +381,10 @@ class SYSNet:
 
         loss_fn = self.Loss(**self.config.loss_kwargs)
         best_structure = src.tune_model_structure(
-            self.Model, dataloaders, loss_fn, structures, params)
+            self.Model, self.Optim, dataloaders, loss_fn, structures, params)
         self.logger.info(
             f'found best structure {best_structure} in {time()-self.t0:.3f} sec')
         exit()
-        return best_structure
 
     def __find_lr(self, train_dataloader, nn_structure, partition_id):
         """
@@ -390,8 +401,8 @@ class SYSNet:
         lrfig_path = self.lrfig_path_fn(partition_id)
 
         model = self.Model(*nn_structure)
-        optimizer = src.AdamW(params=model.parameters(),
-                              lr=1.0e-7, **__adamw_kwargs__)
+        optimizer = self.Optim(params=model.parameters(),
+                              lr=1.0e-7, **self.config.optim_kwargs)
         loss_fn = self.Loss(**self.config.loss_kwargs)
         lr_finder = src.LRFinder(
             model, optimizer, loss_fn, device=self.config.device)
@@ -435,13 +446,13 @@ class SYSNet:
         """ Plots loss vs epochs for training and validation """
         __, train_losses, val_losses = losses
         plt.figure()
-        plt.plot(train_losses, 'k-', label='Training')
+        plt.plot(train_losses, 'k-', label='Training', lw=1)
         plt.plot(val_losses, 'r--', label='Validation')
 
         c = ['r', 'k']
         ls = ['--', '-']
 
-        for i, baseline in enumerate(['base_val_loss', 'base_train_loss']):
+        for i, baseline in enumerate(['base_valid_loss', 'base_train_loss']):
             if baseline in stats:
                 plt.axhline(stats[baseline], c=c[i], ls=':', lw=1)
 
@@ -464,10 +475,10 @@ class SYSNet:
         best_structure : tuple of int
         """
         self.logger.info('# running L1 alpha finder ...')
-        adamw_kwargs = dict(lr=self.config.learning_rate, **__adamw_kwargs__)
+        optim_kwargs = dict(lr=self.config.learning_rate, **self.config.optim_kwargs)
         params = dict(device=self.config.device,
                       nepochs=__nepochs_hyperparams__,
-                      adamw_kw=adamw_kwargs,
+                      optim_kw=optim_kwargs,
                       seed=__global_seed__,
                       verbose=False,
                       l1_alpha=self.config.l1_alpha)
@@ -477,7 +488,7 @@ class SYSNet:
         model = self.Model(*nn_structure, seed=params['seed'])
         loss_fn = self.Loss(**self.config.loss_kwargs)
         best_l1_alpha = src.tune_l1_scale(
-            model, dataloaders, loss_fn, l1_alphas, params)
+            model, self.Optim, dataloaders, loss_fn, l1_alphas, params)
         
         self.logger.info(
             f'found best l1_alpha {best_l1_alpha} in {time()-self.t0:.3f} sec')

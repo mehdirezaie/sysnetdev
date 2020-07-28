@@ -4,7 +4,7 @@ import logging
 import numpy as np
 
 import torch
-from torch.optim import AdamW
+from torch.optim import AdamW, SGD
 
 from .callbacks import EarlyStopping
 from .io import save_checkpoint, load_checkpoint
@@ -13,6 +13,26 @@ from .io import save_checkpoint, load_checkpoint
 Train DL models
 """
 
+__adamw_kwargs__ = dict(betas=(0.9, 0.999), eps=1e-08,
+                        weight_decay=0.0, amsgrad=False)
+
+__sgd_kwargs__ = dict(momentum=0.9, dampening=0, weight_decay=0)
+
+
+
+
+def init_optim(optimizer):
+    optimizer = optimizer.lower()
+    
+    if optimizer == 'adamw':
+        return AdamW, __adamw_kwargs__
+    
+    elif optimizer == 'sgd':
+        return SGD, __sgd_kwargs__
+    
+    else:
+        raise NotImplementedError(f'{optimizer} not implemented')
+    
 
 def train(model, optimizer, loss_fn, dataloader, params, epoch, scheduler=None):
     """
@@ -31,41 +51,40 @@ def train(model, optimizer, loss_fn, dataloader, params, epoch, scheduler=None):
     -------
     loss_avg : training loss
     """
-    # model.to(params['device'])
-    model.train()  # set model to training mode
-    loss_avg = RunningAverage()  # running average object for loss
+    model.train()  
+    loss_avg = RunningAverage() 
     num_steps = len(dataloader)
 
     for i, (data, target, fpix, __) in enumerate(dataloader):
-
-        # move to GPU
+        
         data = data.to(params['device'])
         target = target.to(params['device'])
         fpix = fpix.to(params['device'])
 
-        if scheduler is not None:  # e.g., Cosine Annealing
-            scheduler.step(epoch+i/num_steps)
-
         with torch.set_grad_enabled(True):  # only on training phase
-
-            outputs = model(data)*fpix.unsqueeze(-1)
-            loss = loss_fn(outputs, target)
+            
+            optimizer.zero_grad()  # clear previous gradients
+            output = model(data)
+            loss = loss_fn(output*fpix, target)
             
             if params['l1_alpha'] > 0.0: # do L1 regularization if l1 alpha is positive
                 l1loss = l1_loss(model)
-                loss += params['l1_alpha']*l1loss
-
-            optimizer.zero_grad()  # clear previous gradients
-            loss.backward()
+                loss_tot = loss + params['l1_alpha']*l1loss
+            else:
+                loss_tot = loss
+            
+            loss_tot.backward()
             optimizer.step()
+            
+            if scheduler is not None:  # e.g., Cosine Annealing
+                scheduler.step(epoch+i/num_steps)
+            
+            loss_avg.update(loss, data.size(0))
 
-            loss_avg.update(loss.item(), data.size(0))
-
-    return loss_avg()
+    return loss_avg().item()
 
 
 def evaluate(model, loss_fn, dataloader, params, return_ypred=False):
-    # model.to(params['device'])
     model.eval()
     loss_avg = RunningAverage()
 
@@ -76,20 +95,21 @@ def evaluate(model, loss_fn, dataloader, params, return_ypred=False):
     with torch.no_grad():
 
         for (data, target, fpix, hpix) in dataloader:
+            
             data = data.to(params['device'])
             target = target.to(params['device'])
             fpix = fpix.to(params['device'])
 
-            outputs = model(data)
-            loss = loss_fn(outputs*fpix.unsqueeze(-1), target)
+            output = model(data)
+            loss = loss_fn(output*fpix, target)
 
-            loss_avg.update(loss.item(), data.size(0))
+            loss_avg.update(loss, data.size(0))
 
             if return_ypred:
                 list_hpix.append(hpix)
-                list_ypred.append(outputs)
+                list_ypred.append(output)
 
-        ret = (loss_avg(), )
+        ret = (loss_avg().item(), )
 
         if return_ypred:
             hpix = torch.cat(list_hpix)
@@ -104,29 +124,34 @@ def train_and_eval(model, optimizer, loss_fn, dataloaders, params,
     """
     Train and evaluate a deep learning model every epoch
     """
-    epoch_first,  epoch_last = 0, params['nepochs']
+    epoch_first = 0
+    epoch_last = params['nepochs']
+    best_epoch = 0
+    
+    best_val_loss = 1.0e8  # a very large number
+    train_losses = []     # placeholders for losses
+    valid_losses = []
 
     if (restore_model is not None) & (checkpoint_path is not None):  # reload weights
         restore_path = os.path.join(
             checkpoint_path, restore_model + '.pth.tar')
         #logging.info(f"Restoring parameters from {restore_path}")
-        checkpoint = load_checkpoint(restore_path, model, optimizer, scheduler)
-
+        checkpoint = load_checkpoint(restore_path, model, optimizer, scheduler)  
+        best_val_loss = checkpoint['best_val_loss']
+        best_epoch = checkpoint['epoch']
         epoch_first += checkpoint['epoch']
         epoch_last += checkpoint['epoch']
 
+    # FIXME: see https://pytorch.org/docs/stable/optim.html#constructing-it
     model = model.to(params['device'])
 
     if checkpoint_path is not None:
-        best_epoch = 0
         best_model_wts = copy.deepcopy(model.state_dict())  # copy `best` model
         optim_state = copy.deepcopy(optimizer.state_dict())
-        scheduler_state = copy.deepcopy(
-            scheduler.state_dict()) if scheduler is not None else None
-
-    best_val_loss = 1.0e8  # a very large number
-    train_losses = []     # placeholders for losses
-    valid_losses = []
+        if scheduler is not None:
+            scheduler_state = copy.deepcopy(scheduler.state_dict())
+        else:
+            scheduler_state = None
 
     # early_stopping = EarlyStopping(patience=10, verbose=True) # callbacks
 
@@ -147,12 +172,15 @@ def train_and_eval(model, optimizer, loss_fn, dataloaders, params,
 
         if (valid_loss < best_val_loss):
             best_val_loss = valid_loss
+            
             if checkpoint_path is not None:
                 best_epoch = epoch + 1
+                best_model_wts = copy.deepcopy(model.state_dict())                
                 optim_state = copy.deepcopy(optimizer.state_dict())
-                best_model_wts = copy.deepcopy(model.state_dict())
-                scheduler_state = copy.deepcopy(
-                    scheduler.state_dict()) if scheduler is not None else None
+                if scheduler is not None:
+                    scheduler_state = copy.deepcopy(scheduler.state_dict())
+                else:
+                    scheduler_state = None
 
         if scheduler is not None:
             msg += f"lr: {scheduler.get_last_lr()[0]:.6f}"
@@ -169,7 +197,8 @@ def train_and_eval(model, optimizer, loss_fn, dataloaders, params,
         save_checkpoint({'epoch': best_epoch,
                          'state_dict': best_model_wts,
                          'optim_dict': optim_state,
-                         'scheduler_dict': scheduler_state},
+                         'scheduler_dict': scheduler_state,
+                         'best_val_loss': best_val_loss},
                         checkpoint=checkpoint_path)
         #logging.info(f'saved best model at {checkpoint_path}')
 
@@ -247,7 +276,7 @@ def tune_L1(model,
     return best_l1lambda
 
 
-def tune_l1_scale(model, dataloaders, loss_fn, l1_alphas, params):
+def tune_l1_scale(model, Optim, dataloaders, loss_fn, l1_alphas, params):
     history = {
         'l1_alphas': l1_alphas,
         'best_val_losses': []
@@ -256,7 +285,7 @@ def tune_l1_scale(model, dataloaders, loss_fn, l1_alphas, params):
     for l1_alpha in l1_alphas:
 
         model.apply(weight_reset)
-        optimizer = AdamW(params=model.parameters(), **params_['adamw_kw'])
+        optimizer = Optim(params=model.parameters(), **params_['optim_kw'])
 
         params_.update(l1_alpha=l1_alpha)
         best_val_loss, = train_and_eval(
@@ -271,14 +300,14 @@ def tune_l1_scale(model, dataloaders, loss_fn, l1_alphas, params):
     return best_l1_alpha
 
 
-def tune_model_structure(Model, dataloaders, loss_fn, structures, params):
+def tune_model_structure(Model, Optim, dataloaders, loss_fn, structures, params):
     history = {
         'structures': structures,
         'best_val_losses': []
     }
     for structure in structures:
         model = Model(*structure, seed=params['seed'])  # e.g., (3, 20, 18, 1)
-        optimizer = AdamW(params=model.parameters(), **params['adamw_kw'])
+        optimizer = Optim(params=model.parameters(), **params['optim_kw'])
 
         best_val_loss, = train_and_eval(
             model, optimizer, loss_fn, dataloaders, params, return_losses=False)
@@ -289,6 +318,30 @@ def tune_model_structure(Model, dataloaders, loss_fn, structures, params):
     best_structure = history['structures'][np.argmin(
         history['best_val_losses'])]
     return best_structure
+
+
+def compute_baseline_losses(dataloaders, loss_fn):
+    
+    # baseline: avg. of training label
+    y_train = RunningAverage()
+    for _, target, _, _ in dataloaders['train']:
+        y_train.update(target.sum(), target.size(0))
+
+    pred_ = y_train()
+    
+    baseline_losses = {}
+    
+    for sample, dataloader in dataloaders.items():
+        
+        base_loss = RunningAverage()
+        
+        for _, target, fpix, _ in dataloader:
+            loss_ = loss_fn(pred_*fpix, target)
+            base_loss.update(loss_, target.size(0))
+        
+        baseline_losses[f'base_{sample}_loss'] = base_loss().item()
+    
+    return baseline_losses
 
 
 class RunningAverage(object):

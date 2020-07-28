@@ -79,6 +79,11 @@ def parse_cmd_arguments(parser):
                         type=str,
                         default='dnnp',
                         help='model, dnn or dnnp')
+    
+    parser.add_argument('--optim',
+                        type=str,
+                        default='adamw',
+                        help='adamw or sgd')
 
     parser.add_argument('-ax', '--axes',
                         type=int,

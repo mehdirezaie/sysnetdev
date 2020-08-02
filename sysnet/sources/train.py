@@ -15,7 +15,6 @@ Train DL models
 
 __adamw_kwargs__ = dict(betas=(0.9, 0.999), eps=1e-08,
                         weight_decay=0.0, amsgrad=False)
-
 __sgd_kwargs__ = dict(momentum=0.9, dampening=0, weight_decay=0)
 
 

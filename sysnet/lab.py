@@ -492,23 +492,3 @@ class SYSNet:
         self.logger.info(
             f'found best l1_alpha {best_l1_alpha} in {time()-self.t0:.3f} sec')
         exit()
-
-    # def __find_l1(self, l1_alpha=1.0e-6, seed=42):
-    #     if self.config.find_l1:
-    #         ''' L1 regularization finder
-    #         '''
-    #         raise RuntimeError('Not tested')
-    #         self.logger.info('L1 regularization scale is being tunned')
-    #         model = self.Model(*self.best_structure)
-    #         optimizer = src.AdamW(params=model.parameters(), **self.adamw_kw)
-    #         criterion = self.Cost(**self.cost_kwargs)
-    #         self.l1_alpha = src.tune_L1(model,
-    #                             self.dataloaders,
-    #                             criterion,
-    #                             optimizer,
-    #                             10, #self.config.nepochs,
-    #                             self.device)
-    #         self.logger.info(f'find best L1 scale in {time()-self.t0:.3f} sec')
-    #     else:
-    #         self.l1_alpha = l1_alpha
-    #     self.logger.info(f'l1_alpha: {self.l1_alpha}')

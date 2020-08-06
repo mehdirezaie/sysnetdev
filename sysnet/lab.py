@@ -191,7 +191,6 @@ class SYSNet:
             
         return {**stats, **baseline_losses}
 
-        
     def __train_and_eval_chains(self, dataloaders, nn_structure, partition_id, stats):
         """
         Train and evaluate for 'nchain' times

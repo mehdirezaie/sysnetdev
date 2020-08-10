@@ -21,6 +21,17 @@ __sgd_kwargs__ = dict(momentum=0.9, dampening=0, weight_decay=0)
 
 
 def init_optim(optimizer):
+    """
+
+    parameters
+    ----------
+    optimizer : str,
+        name of the optimizer
+
+    returns
+    -------
+    Optim, Optim_kwargs
+    """
     optimizer = optimizer.lower()
     
     if optimizer == 'adamw':
@@ -235,44 +246,6 @@ def l1_loss(model):
 def weight_reset(m):
     if isinstance(m, torch.nn.BatchNorm1d) or isinstance(m, torch.nn.Linear):
         m.reset_parameters()
-
-
-def tune_L1(model,
-            dataloaders,
-            datasets_len,
-            criterion,
-            optimizer,
-            nepochs,
-            device):
-
-    assert nepochs < 11, 'max nepochs for hyper parameter tunning: 10'
-    l1_lambdas = np.logspace(-6, 0, 10)
-    history = {
-        'l1_lambdas': l1_lambdas,
-        'best_val_losses': []
-    }
-    for l1_lambda in l1_lambdas:
-        logging.info(f'l1_lambda: {l1_lambda}')
-        # reset model weights
-        model.apply(weight_reset)
-        # call train_val ?
-        _, _, best_val_loss = train_val(
-            model=model,
-            dataloaders=dataloaders,
-            datasets_len=datasets_len,
-            criterion=criterion,
-            optimizer=optimizer,
-            nepochs=nepochs,
-            device=device,
-            L1lambda=l1_lambda,
-            L1norm=True
-        )
-
-        history['best_val_losses'].append(best_val_loss)
-
-    best_l1lambda = history['l1_lambdas'][np.argmin(
-        history['best_val_losses'])]
-    return best_l1lambda
 
 
 def tune_l1_scale(model, Optim, dataloaders, loss_fn, l1_alphas, params):

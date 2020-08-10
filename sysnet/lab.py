@@ -105,11 +105,13 @@ class SYSNet:
         src.set_logger(log_path, level=__logger_level__)
         self.logger.info(f"logging in {log_path}")
 
+        # initialize loss, collector, model, optimizor
         self.Loss, self.config.loss_kwargs = src.init_loss(self.config.loss)
         self.collector = src.SYSNetCollector()
         self.Model = src.init_model(self.config.model)
         self.Optim, self.config.optim_kwargs = src.init_optim(self.config.optim)
         
+        # set the device
         self.config.device = torch.device(
             "cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -125,9 +127,9 @@ class SYSNet:
 
         # ---- set the paths
         self.weights_path = os.path.join(
-            self.config.output_path, 'nn-weights.fits')
+            self.config.output_path, 'nn-weights.fits') # NN output, prediction, used as 'weight' for cosmology
         self.metrics_path = os.path.join(
-            self.config.output_path, 'metrics.npz')
+            self.config.output_path, 'metrics.npz')     # traing and val losses, mean & std of featuers, ..
         self.checkpoint_path_fn = lambda pid, sd: os.path.join(
             self.config.output_path, f'model_{pid}_{sd}')
         self.restore_path_fn = lambda pid, sd: os.path.join(
@@ -151,7 +153,8 @@ class SYSNet:
 
         """
         self.logger.info('# running pipeline ...')
-        if self.config.do_rfe:
+        if self.config.do_rfe: # to do recursive feature elimination
+            raise RuntimeError('FIXME: data loading must be performed once')
             self.axes_from_rfe = self.__run_rfe(self.config.axes)
 
         self.logger.info('# training and evaluation')
@@ -311,7 +314,7 @@ class SYSNet:
     def __tune_hyperparams(self, dataloaders, nn_structure, partition_id):
         """
         Tune hyper-parameters including
-            1. learning rate
+            1. learning rate          
             2. number of hidden layers and units
             3. L1 regularization scale
 
@@ -415,7 +418,7 @@ class SYSNet:
     def __run_rfe(self, axes):
         """ Runs Recursive Feature Selection """
         raise NotImplementedError(
-            'the checkpoint cannot be loaded due to shape being not saved')
+            'the checkpoint cannot be loaded due to shape being not saved (data loading must be done once)')
         self.logger.info('# running rfe ...')
         axes_to_keep = {}
         model = src.LinearRegression(add_bias=True)

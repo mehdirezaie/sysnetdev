@@ -3,7 +3,7 @@ from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
 
 from .lr_finder import LRFinder
-from .io import SYSNetCollector, MyDataLoader, load_checkpoint
+from .io import SYSNetCollector, MyDataLoader, load_checkpoint, read_config_yml
 from .models import init_model, LinearRegression
 from .train import (tune_model_structure, train_and_eval,
                     evaluate, tune_l1_scale, compute_baseline_losses,

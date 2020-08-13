@@ -17,7 +17,7 @@ import torch
 torch.autograd.set_detect_anomaly(True) # check 
 
 ap = argparse.ArgumentParser()
-config = sysnet.parse_cmd_arguments(ap)  # read input parameters from the command line
+config = sysnet.parse_cmd_arguments(ap, 'config.yaml')  # read input parameters from the command line
 
 
 # preprocess (read data, randoms, & templates, prepare tabulated data for training)

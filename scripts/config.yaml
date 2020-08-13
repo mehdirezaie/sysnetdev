@@ -1,0 +1,26 @@
+# comment 
+input_path: '../input/eBOSS.ELG.NGC.DR7.table.fits'
+output_path: '../output/model_test' 
+restore_model: None
+batch_size: 4098
+nepochs: 1
+nchains: 1
+find_lr: False
+find_structure: False 
+find_l1: False
+do_kfold: False 
+normalization: 'z-score'
+model: dnn
+optim: adamw
+axes: 
+  - 0
+  - 1 
+  - 2
+do_rfe: False
+eta_min: 1.0e-5
+learning_rate: 1.0e-3
+nn_structure:
+  - 4
+  - 20
+l1_alpha: -1.0  
+loss: mse

@@ -4,7 +4,7 @@ import os
 import logging
 import json
 from json import JSONEncoder
-
+import yaml
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -22,6 +22,25 @@ def tohp(nside, hpix, values):
     zeros[hpix] = values
     return zeros
 
+class Config:
+    def __init__(self, config_file=None):
+        """ 
+        see https://stackoverflow.com/a/1639197/9746916 
+        """
+        if config_file is not None:
+            config = read_config_yml(config_file)
+            for k, v in config.items():
+                setattr(self, k, v)
+        else:
+            pass
+
+    def fetch(self, key, default):
+        return getattr(self, key, default)
+
+def read_config_yml(path_yml):
+    with open(path_yml, 'r') as f:
+        conf = yaml.safe_load(f.read())
+        return conf
 
 def save_checkpoint(state, checkpoint):
     """Saves model and training parameters at checkpoint + 'best.pth.tar'.

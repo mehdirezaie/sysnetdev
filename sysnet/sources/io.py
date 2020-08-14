@@ -25,9 +25,16 @@ def tohp(nside, hpix, values):
 class Config:
     def __init__(self, config_file):
         # https://stackoverflow.com/a/1639197/9746916
-        config = read_config_yml(config_file)
-        for k, v in config.items():
+        self.config = read_config_yml(config_file)
+        for k, v in self.config.items():
             setattr(self, k, v)
+
+    def fetch(self, key, default):
+        try:
+            tmp = self.config[key]
+        except:
+            tmp = default
+        return tmp
 
 def read_config_yml(path_yml):
     with open(path_yml, 'r') as f:

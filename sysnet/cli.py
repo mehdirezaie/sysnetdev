@@ -1,23 +1,11 @@
-
+from sysnet.sources.io import Config
 __all__ = ['parse_cmd_arguments']
-
-class ConfigLoader:
-    def __init__(self, config_file):
-        from sysnet.sources.io import read_config_yml
-        self.config_list = read_config_yml(config_file)
-
-    def fetch(self, key, default):
-        try:
-            tmp = self.config_list[key]
-        except:
-            tmp = default
-        return tmp
 
 def parse_cmd_arguments(parser, yaml_config=None):    
     ''' command argument parser
     '''
     if yaml_config is not None:
-        cf = ConfigLoader(yaml_config)
+        cf = Config(yaml_config)
         
     parser.add_argument('-i', '--input_path',
                         type=str,

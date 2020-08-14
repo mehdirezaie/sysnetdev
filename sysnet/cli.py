@@ -4,9 +4,8 @@ __all__ = ['parse_cmd_arguments']
 def parse_cmd_arguments(parser, yaml_config=None):    
     ''' command argument parser
     '''
-    if yaml_config is not None:
-        cf = Config(yaml_config)
-        
+    cf = Config(yaml_config)
+            
     parser.add_argument('-i', '--input_path',
                         type=str,
                         default=cf.fetch('input_path', '../input/eBOSS.ELG.NGC.DR7.table.fits'),

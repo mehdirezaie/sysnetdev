@@ -1,15 +1,12 @@
-import argparse
-
+from argparse import ArgumentParser
 from sysnet.sources.io import Config
 
-
-__all__ = ['parse_cmd_arguments']
 
 def parse_cmd_arguments(yaml_config=None):    
     ''' command argument parser
     '''
     cf = Config(yaml_config)
-    ap = argparse.ArgumentParser()
+    ap = ArgumentParser()
 
     ap.add_argument('-i', '--input_path',
                         type=str,

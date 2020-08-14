@@ -8,7 +8,9 @@
 """
 import sysnet
 
-sysnet.test_torch()
+debug = False
+if debug:
+    sysnet.detect_anomaly() # this will slow down
 
 config = sysnet.parse_cmd_arguments('config.yaml')
 pipeline = sysnet.SYSNet(config)

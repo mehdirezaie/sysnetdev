@@ -124,7 +124,7 @@ class SYSNetCollector:
         if not os.path.exists(metrics_dir):
             os.makedirs(metrics_dir)
 
-        pred = torch.cat(self.pred, 0).numpy()
+        pred = torch.cat(self.pred, 0).cpu().numpy()
         hpix = torch.cat(self.hpix, 0).numpy()
         weights = np.zeros(pred.shape[0], dtype=[
                            ('hpix', 'i8'), ('weight', 'f8', (pred.shape[1], ))])

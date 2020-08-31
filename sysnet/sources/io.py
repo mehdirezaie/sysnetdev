@@ -27,7 +27,7 @@ class Config:
         """ 
         see https://stackoverflow.com/a/1639197/9746916 
         """
-        if config_file is not None:
+        if (config_file is not None) and (os.path.exists(config_file)):
             config = read_config_yml(config_file)
             for k, v in config.items():
                 setattr(self, k, v)

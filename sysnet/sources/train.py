@@ -4,7 +4,8 @@ import logging
 import numpy as np
 
 import torch
-from torch.optim import AdamW, SGD
+from torch.optim import AdamW, Adam, SGD
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
 from .callbacks import EarlyStopping
 from .io import save_checkpoint, load_checkpoint
@@ -16,9 +17,31 @@ Train DL models
 __adamw_kwargs__ = dict(betas=(0.9, 0.999), eps=1e-08,
                         weight_decay=0.0, amsgrad=False)
 __sgd_kwargs__ = dict(momentum=0.9, dampening=0, weight_decay=0)
+__cosann_warmup_kwargs__ = dict(T_0=10, T_mult=2)
 
+def init_scheduler(config):
+    """
 
+    parameters
+    ----------
+    scheduler : str,
+        name of the scheduler
 
+    returns
+    -------
+    Scheduler, Scheduler_kwargs
+    """
+    scheduler = config.scheduler.lower()
+    
+    if scheduler == 'cosann':
+        kwargs = {'eta_min':config.eta_min, **__cosann_warmup_kwargs__}
+        return CosineAnnealingWarmRestarts, kwargs
+    
+    elif scheduler == 'none':
+        return (None, None)
+    
+    else:
+        raise NotImplementedError(f'{scheduler} not implemented')
 
 def init_optim(optimizer):
     """
@@ -39,6 +62,9 @@ def init_optim(optimizer):
     
     elif optimizer == 'sgd':
         return SGD, __sgd_kwargs__
+
+    elif optimizer == 'adam':
+        return Adam, __adamw_kwargs__
     
     else:
         raise NotImplementedError(f'{optimizer} not implemented')

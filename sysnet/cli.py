@@ -73,6 +73,11 @@ def parse_cmd_arguments(yaml_config=None):
                         default=cf.fetch('optim', 'adamw'),
                         help='adamw or sgd')
 
+    ap.add_argument('--scheduler',
+                        type=str,
+                        default=cf.fetch('scheduler', 'cosann'),
+                        help='cosann or none')
+
     ap.add_argument('-ax', '--axes',
                         type=int,
                         nargs='*',

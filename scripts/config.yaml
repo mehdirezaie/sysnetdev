@@ -12,6 +12,7 @@ do_kfold: False
 normalization: 'z-score'
 model: dnn
 optim: adamw
+scheduler: cosann
 axes: 
   - 0
   - 1 

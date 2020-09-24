@@ -21,7 +21,7 @@ matplotlib.use('Agg')
 __logger_level__ = 'info'  # info, debug, or warning
 __global_seed__ = 85
 __cosann_warmup_kwargs__ = dict(T_0=10, T_mult=2)
-__nepochs_hyperparams__ = 10
+__nepochs_hyperparams__ = 20
 __seed_max__ = 4294967295  # i.e., 2**32 - 1, maximum number in numpy
 
 

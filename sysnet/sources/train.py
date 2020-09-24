@@ -172,13 +172,13 @@ def train_and_eval(model, optimizer, loss_fn, dataloaders, params,
         train_loss = train(model, optimizer, loss_fn,
                            dataloaders['train'], params, epoch, scheduler=scheduler)
         train_losses.append(train_loss)
-        msg += f"train loss: {train_loss:.3f} "
+        msg += f"train loss: {train_loss:.6f} "
 
         # one evaluation over the validation set
         valid_loss, = evaluate(
             model, loss_fn, dataloaders['valid'], params, return_ypred=False)
         valid_losses.append(valid_loss)
-        msg += f"valid loss: {valid_loss:.3f} "
+        msg += f"valid loss: {valid_loss:.6f} "
 
         if (valid_loss < best_val_loss):
             best_val_loss = valid_loss

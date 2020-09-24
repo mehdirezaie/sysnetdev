@@ -4,7 +4,7 @@ import logging
 import numpy as np
 
 import torch
-from torch.optim import AdamW, SGD
+from torch.optim import AdamW, Adam, SGD
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
 from .callbacks import EarlyStopping
@@ -62,6 +62,9 @@ def init_optim(optimizer):
     
     elif optimizer == 'sgd':
         return SGD, __sgd_kwargs__
+
+    elif optimizer == 'adam':
+        return Adam, __adamw_kwargs__
     
     else:
         raise NotImplementedError(f'{optimizer} not implemented')

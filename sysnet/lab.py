@@ -20,7 +20,6 @@ matplotlib.use('Agg')
 # set some global variables which do not change
 __logger_level__ = 'info'  # info, debug, or warning
 __global_seed__ = 85
-__cosann_warmup_kwargs__ = dict(T_0=10, T_mult=2)
 __nepochs_hyperparams__ = 10
 __seed_max__ = 4294967295  # i.e., 2**32 - 1, maximum number in numpy
 
@@ -110,6 +109,8 @@ class SYSNet:
         self.collector = src.SYSNetCollector()
         self.Model = src.init_model(self.config.model)
         self.Optim, self.config.optim_kwargs = src.init_optim(self.config.optim)
+        self.Scheduler, self.config.scheduler_kwargs = src.init_scheduler(self.config)
+        
         
         # set the device
         self.config.device = torch.device(
@@ -260,8 +261,7 @@ class SYSNet:
         model = self.Model(*nn_structure, seed=seed)
         optim_kwargs = dict(lr=self.config.learning_rate, **self.config.optim_kwargs)
         optimizer = self.Optim(params=model.parameters(), **optim_kwargs)
-        scheduler = src.CosineAnnealingWarmRestarts(
-            optimizer, eta_min=self.config.eta_min, **__cosann_warmup_kwargs__)
+        scheduler = self.Scheduler(optimizer, **self.config.scheduler_kwargs) if self.Scheduler is not None else None
         loss_fn = self.Loss(**self.config.loss_kwargs)
         params = dict(nepochs=self.config.nepochs, device=self.config.device,
                       verbose=True, l1_alpha=self.config.l1_alpha)

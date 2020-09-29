@@ -19,6 +19,11 @@ __adamw_kwargs__ = dict(betas=(0.9, 0.999), eps=1e-08,
 __sgd_kwargs__ = dict(momentum=0.9, dampening=0, weight_decay=0)
 __cosann_warmup_kwargs__ = dict(T_0=10, T_mult=2)
 
+def get_device():
+    return torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+
+
 def init_scheduler(config):
     """
 

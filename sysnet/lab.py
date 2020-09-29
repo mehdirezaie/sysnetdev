@@ -10,7 +10,6 @@ import logging
 from time import time
 import numpy as np
 
-import torch
 import sysnet.sources as src
 
 import matplotlib
@@ -112,9 +111,7 @@ class SYSNet:
         self.Scheduler, self.config.scheduler_kwargs = src.init_scheduler(self.config)
         
         
-        # set the device
-        self.config.device = torch.device(
-            "cuda:0" if torch.cuda.is_available() else "cpu")
+        self.config.device = src.get_device() # set the device
 
         self.logger.info('# --- inputs params ---')
         for (key, value) in self.config.__dict__.items():

@@ -9,6 +9,7 @@ find_lr: False
 find_structure: False 
 find_l1: False
 do_kfold: False 
+do_tar: True
 normalization: 'z-score'
 model: dnn
 optim: adamw

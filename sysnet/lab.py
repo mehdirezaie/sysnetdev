@@ -181,6 +181,8 @@ class SYSNet:
         self.logger.info(f'wrote weights: {self.weights_path}')
         self.logger.info(f'wrote metrics: {self.metrics_path}')
         self.collector.save(self.weights_path, self.metrics_path)
+        if self.config.do_tar:
+            self.tar_models(self.config.output_path)
 
     def __add_base_losses(self, stats, dataloaders):
         
@@ -216,7 +218,7 @@ class SYSNet:
 
         for chain_id in range(self.config.nchains):
 
-            seed = seeds[chain_id]
+            seed = seeds[chain_id] + 1000
             self.logger.info(
                 f'# running training and evaluation with seed: {seed}')
 
@@ -492,3 +494,7 @@ class SYSNet:
         self.logger.info(
             f'found best l1_alpha {best_l1_alpha} in {time()-self.t0:.3f} sec')
         exit()
+
+    def tar_models(self, path_models, model_fmt='model_*_*', tarfile_name='models.tar.gz'):
+        """ Tar all models to reduce the number of outputs """
+        src.tar_models(path_models, model_fmt='model_*_*', tarfile_name='models.tar.gz')

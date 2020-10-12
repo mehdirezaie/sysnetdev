@@ -16,6 +16,47 @@ import healpy as hp
 from sklearn.model_selection import train_test_split, KFold
 
 
+def tar_models(path_models, model_fmt='model_*_*', tarfile_name='models.tar.gz'):
+    """
+        1. Change to the directory of the best models
+        2. Tar them into a tar file
+        3. Remove the directories and only keep the tar file
+        4. Change back to the main directory.
+
+
+        inputs
+        -------
+        path_models: str
+            path to the best models
+        model_fmt: str
+            naming format of the best model directories
+        tarfile_name: str
+            name of the tar file that will hole the model directories
+    """
+    path_models = os.path.abspath(path_models)
+
+    home = os.getcwd()
+    cmd1 = f'tar -zcvf {tarfile_name} {model_fmt}'
+    cmd2 = f'rm -rf {model_fmt}'
+
+    os.chdir(path_models)
+    current_dir = os.getcwd()
+    if current_dir == path_models:
+        flag1 = os.system(cmd1)
+        if flag1==0:
+            flag2 = os.system(cmd2)
+            if flag2 != 0:print(f'1. something went wrong with {cmd2}')
+        else:
+            print(f'2. something went wrong with {cmd1}: {flag1}')
+    else:
+        print(f'3. something went wrong with {path_models}: {current_dir}')
+
+    os.chdir(home)
+    current_dir = os.getcwd()
+    if current_dir!=home:print(f'4. something went wrong with {home}: {current_dir}')
+
+
+
 def tohp(nside, hpix, values):
     zeros = np.empty(12*nside*nside, dtype=values.dtype)
     zeros[:] = np.nan

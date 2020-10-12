@@ -58,6 +58,11 @@ def parse_cmd_arguments(yaml_config=None):
                         action='store_true',
                         help='enable k-fold cross validation (k=5)')
 
+    ap.add_argument('--do_tar',
+                        default=cf.fetch('do_tar', True),
+                        action='store_true',
+                        help='tar all the models')
+
     ap.add_argument('-norm', '--normalization',
                         type=str,
                         default=cf.fetch('normalization', 'z-score'), 

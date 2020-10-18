@@ -161,8 +161,8 @@ class SYSNet:
         for partition_id in range(0, num_partitions):  # k-fold validation loop
 
             axes = self.__axes_for_partition(partition_id)
-            # (# units, # hidden layers, # input layer units, # output unit)
-            nn_structure = (*self.config.nn_structure, len(axes), 1)
+            # if non-linear (# units, # hidden layers, # input layer units, # output unit)
+            nn_structure = self.__get_structure(len(axes))
             
             self.logger.info(f'partition_{partition_id} with {nn_structure}')
 
@@ -309,6 +309,13 @@ class SYSNet:
             model, loss_fn, dataloader, params, return_ypred=True)
         # self.logger.info(f'finish evaluation in {time()-self.t0:.3f} sec')
         return predictions
+    
+    def __get_structure(self, input_dim):
+        if self.config.model in ['dnn', 'dnnp']:
+            return (*self.config.nn_structure, input_dim, 1)
+        else:
+            return (input_dim, 1)
+
 
     def __tune_hyperparams(self, dataloaders, nn_structure, partition_id):
         """

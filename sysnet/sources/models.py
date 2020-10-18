@@ -101,7 +101,7 @@ class DNNPoisson(DNN):
 
 class LinearNet(nn.Module):
 
-    def __init__(self, input_dim=18, seed=42):
+    def __init__(self, nb_layers, nb_units, input_dim=18, output_dim=1, seed=42):
         torch.manual_seed(seed=seed)
         super(LinearNet, self).__init__()
         self.hl1 = nn.Linear(input_dim, 1)
@@ -112,8 +112,8 @@ class LinearNet(nn.Module):
 
 
 class LinearPoisson(LinearNet):
-    def __init__(self, input_dim=18, seed=42):
-        super(LinearPoisson, self).__init__(input_dim=input_dim, seed=seed)
+    def __init__(self, nb_layers, nb_units, input_dim=18, output_dim=1, seed=42):
+        super(LinearPoisson, self).__init__(nb_layers, nb_units, input_dim=input_dim, output_dim=output_dim, seed=seed)
 
     def forward(self, x):
         x = super(LinearPoisson, self).forward(x)

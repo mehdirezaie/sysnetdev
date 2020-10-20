@@ -36,7 +36,7 @@ def tar_models(path_models, model_fmt='model_*_*', tarfile_name='models.tar.gz')
     path_models = os.path.abspath(path_models)
 
     home = os.getcwd()
-    cmd1 = f'tar -zcvf {tarfile_name} {model_fmt}'
+    cmd1 = f'tar -zcf {tarfile_name} {model_fmt}'
     cmd2 = f'rm -rf {model_fmt}'
 
     os.chdir(path_models)

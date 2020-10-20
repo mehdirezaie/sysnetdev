@@ -268,7 +268,7 @@ class SYSNet:
         losses = src.train_and_eval(model, optimizer, loss_fn, dataloaders, params,
                                     checkpoint_path=checkpoint_path, scheduler=scheduler,
                                     restore_model=self.config.restore_model, return_losses=True)
-        self.__plot_losses(losses, stats, lossfig_path)
+        #self.__plot_losses(losses, stats, lossfig_path)
         self.logger.info(
             f'finished training in {time()-self.t0:.3f} sec, checkout {lossfig_path}')
         return losses

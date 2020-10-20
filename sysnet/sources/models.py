@@ -17,6 +17,10 @@ def init_model(model):
         return DNN
     elif model == 'dnnp':
         return DNNPoisson
+    elif model == 'lin':
+        return LinearNet
+    elif model == 'linp':
+        return LinearPoisson
     else:
         raise NotImplementedError(f'Model {model} is not implemented!')
 
@@ -35,7 +39,7 @@ class DNN(nn.Module):
     '''
 
     def __init__(self, nb_layers, nb_units, input_dim=18, output_dim=1, seed=42):
-        assert nb_layers >= 2
+        assert nb_layers > 1
         torch.manual_seed(seed=seed)
         super(DNN, self).__init__()
         self.fc = nn.ModuleList()  # []
@@ -72,7 +76,7 @@ class DNNPoisson(DNN):
 
     examples
     ---------
-    a = DNN(3, 100, 500, 500)
+    a = DNNPoisson(3, 100, 500, 500)
     input = Variable(torch.Tensor(10, 500))
     output = a(input)
     '''
@@ -97,13 +101,24 @@ class DNNPoisson(DNN):
 
 class LinearNet(nn.Module):
 
-    def __init__(self, in_features=18):
+    def __init__(self, input_dim=18, output_dim=1, seed=42):
+        torch.manual_seed(seed=seed)
         super(LinearNet, self).__init__()
-        self.hl1 = nn.Linear(in_features, 1)
+        self.hl1 = nn.Linear(input_dim, output_dim)
 
     def forward(self, x):
         x = self.hl1(x)
         return x
+
+
+class LinearPoisson(LinearNet):
+    def __init__(self, input_dim=18, output_dim=1, seed=42):
+        super(LinearPoisson, self).__init__(input_dim=input_dim, output_dim=output_dim, seed=seed)
+
+    def forward(self, x):
+        x = super(LinearPoisson, self).forward(x)
+        return F.softplus(x, threshold=1000)
+
 
 
 class LinearRegression:

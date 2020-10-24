@@ -2,7 +2,7 @@ SYSNet: an end-to-end imaging systematics cleaning pipeline
 ===========================================================
 
 [![arXiv](https://img.shields.io/badge/arXiv-1907.11355-b31b1b.svg)](https://arxiv.org/pdf/1907.11355)
-[![License: MIT](https://img.shields.io/badge/License-MIT-006905.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **SYSNet** is an open source software based on Python for modeling the imaging systematics in large-scale structure data. The observed galaxy density maps are a combination of true signal and systematic noise. The latter is inevitably unknown, however, we do have a set of templates for observational realities that may be the potential sources of systematic error. SYSNet uses a fully connected neural network to model the response to the templates. The methodology is decribed in [Rezaie, Seo, Ross, Bunescu (2020)](https://doi.org/10.1093/mnras/staa1231). The code incorporates:
 

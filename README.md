@@ -1,3 +1,6 @@
+SYSNet: an end-to-end imaging systematics cleaning pipeline
+===========================================================
+
 [![arXiv](https://img.shields.io/badge/arXiv-1907.11355-b31b1b.svg)](https://arxiv.org/pdf/1907.11355)
 [![License: MIT](https://img.shields.io/badge/License-MIT-006905.svg)](https://opensource.org/licenses/MIT)
 

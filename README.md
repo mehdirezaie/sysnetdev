@@ -1,4 +1,5 @@
-[![arXiv](https://img.shields.io/badge/arXiv-1234.56789-00ff00.svg)](https://arxiv.org/pdf/1907.11355)
+[![arXiv](https://img.shields.io/badge/arXiv-1907.11355-006905.svg)](https://arxiv.org/pdf/1907.11355)
+[![License: MIT](https://img.shields.io/badge/License-MIT-006905.svg)](https://opensource.org/licenses/MIT)
 
 This repository reimplements the SYSNet software in Pytorch. The methodology is decribed in https://doi.org/10.1093/mnras/staa1231. Improvements include:
 1. Cyclic Learning Rate (Loshchilov & Hutter 2016 / ICLR 2017)

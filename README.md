@@ -86,9 +86,12 @@ The last command will train the network for one epoch.
 You can also run the test in interactive Python or Jupyter:  
 ```Python
 import sys 
-sys.path.append('/Users/mehdi/github/sysnetdev') # add the path to SYSNet
+# add the path to SYSNet
+sys.path.append('/Users/mehdi/github/sysnetdev') 
 from sysnet import SYSNet, Config
-config = Config('config.yaml')                   # read the default config file which is in the directory 'scripts'
+
+# read the default config file which is in the directory 'scripts'
+config = Config('config.yaml')                   
 pipeline = SYSNet(config)                        
 pipeline.run()
 ```

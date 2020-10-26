@@ -88,7 +88,7 @@ You can also run the test in interactive Python or Jupyter:
 import sys 
 sys.path.append('/Users/mehdi/github/sysnetdev') # add the path to SYSNet
 from sysnet import SYSNet, Config
-config = Config('../scripts/config.yaml')        # read the default config file
+config = Config('config.yaml')                   # read the default config file which is in the directory 'scripts'
 pipeline = SYSNet(config)                        
 pipeline.run()
 ```

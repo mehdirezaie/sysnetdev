@@ -50,7 +50,7 @@ Once your environment is created, you must activate it and use the appropriate P
 2.e `$> conda install pytorch torchvision cudatoolkit=10.1 -c pytorch # on OSC`
 
 3. Install miscellaneous packages: After installation of Pytorch, execute the following commands to install the required packages:  
-3.a `$> conda install git jupyter ipykernel ipython mpi4py`
+3.a `$> conda install git jupyter ipykernel ipython mpi4py`  
 3.b `$> conda install -c conda-forge fitsio healpy absl-py pytables`  
 Use the following command to add your env kernel (e.g., sysnet) to Jupyter:  
 3.c `$> python -m ipykernel install --user --name=sysnet --display-name "python (sysnet)"`

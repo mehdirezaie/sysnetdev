@@ -1,10 +1,12 @@
 #!/usr/bin/env python
-"""
-    TODO:
-        - Check the ratio of the training loss to the baseline loss for the MSE and Poisson cost func.
-        - Save Hyper-parameters in case we don't want to do hp training again?
-        - Add a yaml file to use for the inputs, useful for scaling to 1k mocks
-        - with feature selection the shape of the input layer is different, the model cannot be restored
+""" 
+    A high-level code for running the SYSNet software
+
+    Take a look into the config file under the directory 'scripts'
+    to learn about the input parameters.
+    
+    Mehdi Rezaie, mr095415@ohio.edu
+    October 2020
 """
 import sysnet
 

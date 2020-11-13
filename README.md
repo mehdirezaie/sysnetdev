@@ -22,7 +22,7 @@ We plan to perform integrated tests of the code, including all models in a minic
 
 Installation
 ============
-**SYSNet** relies primarily on Pytorch, scikit-learn, numpy, fitsio, and healpy. We recommend using Conda for installation, particularly beacause it allows creating new environments that do not impact the entire computing system. The installation can be divided into three steps:
+**SYSNet** relies primarily on Pytorch, scikit-learn, numpy, fitsio, and healpy. We recommend using Conda for installation, particularly because it allows creating new environments that do not impact the entire computing system. The installation can be divided into three steps:
 1. Install/update Conda 
 2. Install Pytorch 
 3. Install miscellaneous packages 

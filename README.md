@@ -87,7 +87,7 @@ You can also run the test in interactive Python or Jupyter:
 ```Python
 import sys 
 # add the path to SYSNet
-sys.path.append('/Users/mehdi/github/sysnetdev') 
+sys.path.append('/Users/mehdi/test/sysnetdev') 
 from sysnet import SYSNet, Config
 
 # read the default config file which is in the directory 'scripts'

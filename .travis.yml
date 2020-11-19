@@ -1,7 +1,23 @@
 language: python
 
 python:
-  - 3.7
-  
+  - 3.8
+
+install:
+  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - source "$HOME/miniconda/etc/profile.d/conda.sh"
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  - conda info -a
+  - conda create -q -n sysnet python=3.8 scikit-learn git jupyter ipykernel ipython mpi4py
+  - conda activate sysnet
+  - conda install pytorch torchvision -c pytorch
+  - conda install -c conda-forge fitsio healpy absl-py pytables
+
+before_script:
+  - export PYTHONPATH=${PWD}
+
 script:
   - python run-tests.py

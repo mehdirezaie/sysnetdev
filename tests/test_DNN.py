@@ -1,21 +1,32 @@
-from sysnet.sources.models import DNN, DNNPoisson
-from torch import Tensor
-from torch.autograd import Variable
+import unittest
 
+from sysnet.sources.models import DNN, DNNPoisson
+from torch.autograd import Variable
 import torch
 
-msg = 'Test Deep Neural Network\n'
-msg += f'PyTorch: {torch.__version__}\n'
-print(msg)
+def test_dnn():
+    """ Test DNN and DNNP """
+    shape = (3, 100, 4, 1) # (# layers, # units, # input, # output)
 
-a = DNNPoisson(3, 100, 500, 500)
+    dnn = DNN(*shape)
+    dnnp = DNNPoisson(*shape) 
 
-input = Variable(Tensor(10, 500))
-output = a(input)
+    x = Variable(torch.Tensor([[1, 2, 3, 4], 
+                              [5, 6, 7, 8]]))
+    y_ = dnn(x)
+    y1 = torch.log(1. + torch.exp(y_))
+    y2 = dnnp(x)
 
-msg = f'a: {a}\n'
-msg += f'input: {input}\n'
-msg += f'output: {output}\n'
-msg += f'a: {a.fc[0].weight}'
+    return torch.allclose(y1, y2)
 
-print(msg)
+
+
+
+
+class TestDNNs(unittest.TestCase):
+    def test_allclose(self):
+        self.assertTrue(test_dnn())
+
+
+if __name__ == '__main__':
+    unittest.main(argv=[''],verbosity=2, exit=False)

@@ -11,7 +11,7 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
-  - conda create -q -n sysnet python=3.8 scikit-learn git jupyter ipykernel ipython mpi4py
+  - conda create -q -n sysnet python=3.8 scikit-learn git jupyter ipykernel ipython mpi4py matplotlib
   - conda activate sysnet
   - conda install pytorch torchvision -c pytorch
   - conda install -c conda-forge fitsio healpy absl-py pytables

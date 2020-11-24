@@ -25,7 +25,7 @@ def parse_cmd_arguments(yaml_config=None):
 
     ap.add_argument('-bs', '--batch_size',
                         type=int,
-                        default=cf.fetch('batch_size', 4098),
+                        default=cf.fetch('batch_size', 512),
                         help='minibatch size')
 
     ap.add_argument('-ne', '--nepochs',
@@ -59,7 +59,7 @@ def parse_cmd_arguments(yaml_config=None):
                         help='enable k-fold cross validation (k=5)')
 
     ap.add_argument('--do_tar',
-                        default=cf.fetch('do_tar', True),
+                        default=cf.fetch('do_tar', False),
                         action='store_true',
                         help='tar all the models')
 

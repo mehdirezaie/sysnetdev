@@ -16,5 +16,5 @@ if debug:
 
 config = sysnet.parse_cmd_arguments('config.yaml')
 pipeline = sysnet.SYSNetSnapshot(config)
-pipeline.config.scheduler_kwargs.update(T_0=50, T_mult=1)
+pipeline.config.scheduler_kwargs.update(T_0=20, T_mult=1)
 pipeline.run()

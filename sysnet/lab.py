@@ -214,8 +214,7 @@ class SYSNet:
 
         """
         np.random.seed(__global_seed__)
-        seeds = np.random.choice(np.arange(0, __seed_max__), 
-                                 size=self.config.nchains, replace=False)
+        seeds = np.random.randint(0, __seed_max__, size=self.config.nchains)
 
         self.collector.start()
 

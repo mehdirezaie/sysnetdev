@@ -7,9 +7,12 @@
 import matplotlib.pyplot as plt
 import os
 import logging
-from time import time
-import numpy as np
 
+import numpy as np
+from time import time
+from glob import glob
+
+import torch
 import sysnet.sources as src
 
 import matplotlib
@@ -153,16 +156,16 @@ class SYSNet:
         self.logger.info('# running pipeline ...')
         if self.config.do_rfe: # to do recursive feature elimination
             raise RuntimeError('FIXME: data loading must be performed once')
-            self.axes_from_rfe = self.__run_rfe(self.config.axes)
+            self.axes_from_rfe = self.run_rfe(self.config.axes)
 
         self.logger.info('# training and evaluation')
         num_partitions = 5 if self.config.do_kfold else 1
 
         for partition_id in range(0, num_partitions):  # k-fold validation loop
 
-            axes = self.__axes_for_partition(partition_id)
+            axes = self.axes_for_partition(partition_id)
             # if non-linear (# units, # hidden layers, # input layer units, # output unit)
-            nn_structure = self.__get_structure(len(axes))
+            nn_structure = self.get_structure(len(axes))
             
             self.logger.info(f'partition_{partition_id} with {nn_structure}')
 
@@ -171,11 +174,11 @@ class SYSNet:
                                                    normalization=self.config.normalization,
                                                    axes=axes)
             
-            stats = self.__add_base_losses(stats, dataloaders)
+            stats = self.add_base_losses(stats, dataloaders)
 
-            self.__tune_hyperparams(dataloaders, nn_structure, partition_id)
+            self.tune_hyperparams(dataloaders, nn_structure, partition_id)
 
-            self.__train_and_eval_chains(
+            self.train_and_eval_chains(
                 dataloaders, nn_structure, partition_id, stats)  # for 'nchains' times
 
         self.logger.info(f'wrote weights: {self.weights_path}')
@@ -184,7 +187,7 @@ class SYSNet:
         if self.config.do_tar:
             self.tar_models(self.config.output_path)
 
-    def __add_base_losses(self, stats, dataloaders):
+    def add_base_losses(self, stats, dataloaders):
         
         loss_fn = self.Loss(**self.config.loss_kwargs)
         baseline_losses = src.compute_baseline_losses(dataloaders, loss_fn)
@@ -194,7 +197,7 @@ class SYSNet:
             
         return {**stats, **baseline_losses}
 
-    def __train_and_eval_chains(self, dataloaders, nn_structure, partition_id, stats):
+    def train_and_eval_chains(self, dataloaders, nn_structure, partition_id, stats):
         """
         Train and evaluate for 'nchain' times
 
@@ -211,30 +214,37 @@ class SYSNet:
 
         """
         np.random.seed(__global_seed__)
-        seeds = np.random.randint(
-            0, __seed_max__, size=self.config.nchains)  # initialization seed
+        seeds = np.random.choice(np.arange(0, __seed_max__), 
+                                 size=self.config.nchains, replace=False)
 
         self.collector.start()
 
         for chain_id in range(self.config.nchains):
 
-            seed = seeds[chain_id] + 1000
+            seed = seeds[chain_id]
             self.logger.info(
                 f'# running training and evaluation with seed: {seed}')
 
-            train_val_losses = self.__train(
+            train_val_losses = self.train(
                 dataloaders, nn_structure, seed, partition_id, stats)
 
             restore_path = self.restore_path_fn(partition_id, seed)
-            test_loss, hpix, pred_ = self.__evaluate(
+            test_loss, hpix, pred_ = self.evaluate(
                 dataloaders['test'], nn_structure, restore_path)
-            self.logger.info(
-                f'best val loss: {train_val_losses[0]:.3f}, test loss: {test_loss:.3f}')
+            
+            if isinstance(test_loss, list):                
+                self.logger.info(
+                    f'best val loss: {train_val_losses[0]:.6f}, (mean) test loss: {np.mean(test_loss):.6f}')
+            else:
+                self.logger.info(
+                    f'best val loss: {train_val_losses[0]:.6f}, test loss: {test_loss:.6f}')
+                
             self.collector.collect_chain(train_val_losses, test_loss, pred_)
+
 
         self.collector.finish(stats, hpix)
 
-    def __train(self, dataloaders, nn_structure, seed, partition_id, stats):
+    def train(self, dataloaders, nn_structure, seed, partition_id, stats):
         """
         Train and evaluate a nn on training and validation sets
 
@@ -267,13 +277,14 @@ class SYSNet:
 
         losses = src.train_and_eval(model, optimizer, loss_fn, dataloaders, params,
                                     checkpoint_path=checkpoint_path, scheduler=scheduler,
-                                    restore_model=self.config.restore_model, return_losses=True)
+                                    restore_model=self.config.restore_model, return_losses=True,
+                                    snapshot_ensemble=self.config.snapshot_ensemble)
         #self.__plot_losses(losses, stats, lossfig_path)
         self.logger.info(
             f'finished training in {time()-self.t0:.3f} sec, checkout {lossfig_path}')
         return losses
 
-    def __evaluate(self, dataloader, nn_structure, restore_path):
+    def evaluate(self, dataloader, nn_structure, restore_path):
         """
         Evaluates a trained neural network on the test set
 
@@ -310,14 +321,14 @@ class SYSNet:
         # self.logger.info(f'finish evaluation in {time()-self.t0:.3f} sec')
         return predictions
     
-    def __get_structure(self, input_dim):
+    def get_structure(self, input_dim):
         if self.config.model in ['dnn', 'dnnp']:
             return (*self.config.nn_structure, input_dim, 1)
         else:
             return (input_dim, 1)
 
 
-    def __tune_hyperparams(self, dataloaders, nn_structure, partition_id):
+    def tune_hyperparams(self, dataloaders, nn_structure, partition_id):
         """
         Tune hyper-parameters including
             1. learning rate          
@@ -342,19 +353,19 @@ class SYSNet:
             self.logger.info('# running hyper-parameter tunning ...')
 
             if self.config.find_lr:
-                self.__find_lr(dataloaders['train'],
+                self.find_lr(dataloaders['train'],
                                nn_structure, partition_id)
                 # exit
 
             if self.config.find_structure:
-                self.__find_structure(dataloaders, nn_structure)  
+                self.find_structure(dataloaders, nn_structure)  
                 # exit
 
             if self.config.find_l1:
-                self.__find_l1alpha(dataloaders, nn_structure)
+                self.find_l1alpha(dataloaders, nn_structure)
                 # exit
 
-    def __find_structure(self, dataloaders, nn_structure):
+    def find_structure(self, dataloaders, nn_structure):
         """
         Tune NN structure by trying
             1 hidden layers x 20 units
@@ -394,7 +405,7 @@ class SYSNet:
             f'found best structure {best_structure} in {time()-self.t0:.3f} sec')
         exit()
 
-    def __find_lr(self, train_dataloader, nn_structure, partition_id):
+    def find_lr(self, train_dataloader, nn_structure, partition_id):
         """
         Find learning rate
 
@@ -421,7 +432,7 @@ class SYSNet:
         exit(
             f'LR finder done in {time()-self.t0:.3f} sec, check out {lrfig_path}')
 
-    def __run_rfe(self, axes):
+    def run_rfe(self, axes):
         """ Runs Recursive Feature Selection """
         raise NotImplementedError(
             'the checkpoint cannot be loaded due to shape being not saved (data loading must be done once)')
@@ -443,14 +454,14 @@ class SYSNet:
             self.logger.info(f"{key}: {axes_to_keep[key]}")
         return axes_to_keep
 
-    def __axes_for_partition(self, partition_id):
+    def axes_for_partition(self, partition_id):
         """ Returns axes (indices of imaging maps) for partition 'partition_id' """
         if self.config.do_rfe:
             return self.axes_from_rfe[partition_id]
         else:
             return self.config.axes
 
-    def __plot_losses(self, losses, stats, lossfig_path):
+    def plot_losses(self, losses, stats, lossfig_path):
         """ Plots loss vs epochs for training and validation """
         __, train_losses, val_losses = losses
         plt.figure()
@@ -470,7 +481,7 @@ class SYSNet:
         plt.savefig(lossfig_path, bbox_inches='tight')
         plt.close()
 
-    def __find_l1alpha(self, dataloaders, nn_structure):
+    def find_l1alpha(self, dataloaders, nn_structure):
         """
         parameters
         ----------
@@ -505,3 +516,46 @@ class SYSNet:
     def tar_models(self, path_models, model_fmt='model_*_*', tarfile_name='models.tar.gz'):
         """ Tar all models to reduce the number of outputs """
         src.tar_models(path_models, model_fmt='model_*_*', tarfile_name='models.tar.gz')
+
+        
+class SYSNetSnapshot(SYSNet):
+    def __init__(self, *arrays, **kwargs):
+        super(SYSNetSnapshot, self).__init__(*arrays, **kwargs)
+    
+    def evaluate(self, dataloader, nn_structure, restore_path):
+        """
+        Evaluates an ensemble trained neural network on the test set
+
+        parameters
+        ----------
+        dataloader :
+        nn_structure : (tuple of int)
+            i.e., (# layers, # units, # features, 1)
+        restore_path : (str)
+            path to the file to restore the weights from
+
+
+        returns
+        -------
+        predictions : (test loss, hpix, pred)
+            test loss
+            healpix pixel indices
+            predicted number of galaxies in the pixel
+
+        see also
+        --------
+        1. https://pytorch.org/tutorials/beginner/saving_loading_models.html
+        """
+        snapshot_path = os.path.dirname(restore_path)
+        snapshots = glob(os.path.join(snapshot_path, 'snapshot_*.pth.tar'))
+        
+        self.logger.info(f"Restoring parameters from {len(snapshots)} snapshots")
+        
+        pred_ensemble = []
+        testloss_ensemble = []
+        for snapshot_i in snapshots:
+            test_loss_, hpix_, pred_ = super(SYSNetSnapshot, self).evaluate(dataloader, nn_structure, snapshot_i)
+            pred_ensemble.append(pred_)
+            testloss_ensemble.append(test_loss_)
+            
+        return testloss_ensemble, hpix_, torch.cat(pred_ensemble, 1)

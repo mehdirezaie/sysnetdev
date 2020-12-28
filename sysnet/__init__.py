@@ -1,5 +1,5 @@
 
-from .lab import SYSNet
+from .lab import SYSNet, SYSNetSnapshot
 from .cli import parse_cmd_arguments
 from .sources.io import Config
 

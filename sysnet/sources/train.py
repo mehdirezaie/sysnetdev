@@ -22,6 +22,9 @@ __cosann_warmup_kwargs__ = dict(T_0=10, T_mult=2)
 def get_device():
     return torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+def did_restart(T_cur, T_i):
+    """ check if scheduler restarted """
+    return T_cur >= (T_i-1)
 
 
 def init_scheduler(config):
@@ -161,7 +164,8 @@ def evaluate(model, loss_fn, dataloader, params, return_ypred=False):
 
 
 def train_and_eval(model, optimizer, loss_fn, dataloaders, params,
-                   checkpoint_path=None, scheduler=None, restore_model=None, return_losses=False):
+                   checkpoint_path=None, scheduler=None, restore_model=None, return_losses=False,
+                   snapshot_ensemble=False):
     """
     Train and evaluate a deep learning model every epoch
     """
@@ -210,7 +214,19 @@ def train_and_eval(model, optimizer, loss_fn, dataloaders, params,
             model, loss_fn, dataloaders['valid'], params, return_ypred=False)
         valid_losses.append(valid_loss)
         msg += f"valid loss: {valid_loss:.6f} "
-
+        
+        if scheduler is not None:
+            msg += f"lr: {scheduler.get_last_lr()[0]:.6f}"
+            if snapshot_ensemble:
+                if did_restart(scheduler.T_cur, scheduler.T_i):
+                    save_checkpoint({'epoch': epoch+1,
+                                     'state_dict': copy.deepcopy(model.state_dict()),
+                                     'optim_dict': copy.deepcopy(optimizer.state_dict()),
+                                     'scheduler_dict': copy.deepcopy(scheduler.state_dict()),
+                                     'best_val_loss': valid_loss},
+                                      checkpoint=checkpoint_path,
+                                      name=f'snapshot_{epoch}.pth.tar')                                                 
+                    
         if (valid_loss < best_val_loss):
             best_val_loss = valid_loss
             
@@ -221,10 +237,7 @@ def train_and_eval(model, optimizer, loss_fn, dataloaders, params,
                 if scheduler is not None:
                     scheduler_state = copy.deepcopy(scheduler.state_dict())
                 else:
-                    scheduler_state = None
-
-        if scheduler is not None:
-            msg += f"lr: {scheduler.get_last_lr()[0]:.6f}"
+                    scheduler_state = None                
 
         if params['verbose']:
             logging.info(msg)

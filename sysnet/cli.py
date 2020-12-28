@@ -63,6 +63,11 @@ def parse_cmd_arguments(yaml_config=None):
                         action='store_true',
                         help='tar all the models')
 
+    ap.add_argument('--snapshot_ensemble',
+                        default=cf.fetch('snapshot_ensemble', False),
+                        action='store_true',
+                        help='turn on snapshot ensemble')    
+
     ap.add_argument('-norm', '--normalization',
                         type=str,
                         default=cf.fetch('normalization', 'z-score'), 

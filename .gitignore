@@ -6,7 +6,6 @@ __pycache__
 *.fits
 *.tar
 *.log
-*.png
 *.npz
 *.pt
 *.so

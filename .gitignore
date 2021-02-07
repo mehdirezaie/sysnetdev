@@ -1,6 +1,5 @@
 .DS_Store
 input/001/
-docs/
 __pycache__
 *.pyc
 *.fits

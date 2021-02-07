@@ -3,13 +3,16 @@
 `SYSNet` was developed to tackle the problem of imaging systematic effects, e.g., Galactic dust, in galaxy survey data.
 
 ## Installation
-We recommend Conda for installation:
+We recommend Conda for installing the required packages:
 ```bash
   conda create -q -n sysnet python=3.8 scikit-learn git jupyter ipykernel ipython mpi4py matplotlib
   conda activate sysnet
   conda install pytorch torchvision -c pytorch
   conda install -c conda-forge fitsio healpy absl-py pytables pyyaml
 ```
+Then, clone the sysnetdev repository using `git clone https://github.com/mehdirezaie/sysnetdev.git` and add the path to the PYTHONPATH variable:
+
+`export PYTHONPATH=\path\to\sysnetdev:PYTHONPATH`, you need to replace `\path\to\sysnetdev` with the path to sysnetdev.
 
 ## Summary
 

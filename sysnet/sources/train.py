@@ -162,6 +162,30 @@ def evaluate(model, loss_fn, dataloader, params, return_ypred=False):
 
     return ret
 
+def forward(model, dataloader, params):
+    model.eval()
+
+    list_hpix = []
+    list_ypred = []
+
+    with torch.no_grad():
+
+        for (data, target, fpix, hpix) in dataloader:
+            
+            data = data.to(params['device'])
+            target = target.to(params['device'])
+            fpix = fpix.to(params['device'])
+
+            output = model(data)       
+            list_hpix.append(hpix)
+            list_ypred.append(output)
+
+
+        hpix = torch.cat(list_hpix)
+        ypred = torch.cat(list_ypred)
+
+    return hpix, ypred
+
 
 def train_and_eval(model, optimizer, loss_fn, dataloaders, params,
                    checkpoint_path=None, scheduler=None, restore_model=None, return_losses=False,

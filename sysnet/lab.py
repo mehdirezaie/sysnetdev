@@ -6,9 +6,11 @@
 """
 import matplotlib.pyplot as plt
 import os
+import sys
 import logging
 
 import numpy as np
+import fitsio as ft
 from time import time
 from glob import glob
 
@@ -278,7 +280,7 @@ class SYSNet:
                                     checkpoint_path=checkpoint_path, scheduler=scheduler,
                                     restore_model=self.config.restore_model, return_losses=True,
                                     snapshot_ensemble=self.config.snapshot_ensemble)
-        #self.__plot_losses(losses, stats, lossfig_path)
+        self.plot_losses(losses, stats, lossfig_path)
         self.logger.info(
             f'finished training in {time()-self.t0:.3f} sec, checkout {lossfig_path}')
         return losses
@@ -402,7 +404,7 @@ class SYSNet:
             self.Model, self.Optim, dataloaders, loss_fn, structures, params)
         self.logger.info(
             f'found best structure {best_structure} in {time()-self.t0:.3f} sec')
-        exit()
+        sys.exit()
 
     def find_lr(self, train_dataloader, nn_structure, partition_id):
         """
@@ -428,7 +430,7 @@ class SYSNet:
         lr_finder.plot(lrfig_path=lrfig_path)
         lr_finder.reset()
 
-        exit(
+        sys.exit(
             f'LR finder done in {time()-self.t0:.3f} sec, check out {lrfig_path}')
 
     def run_rfe(self, axes):
@@ -510,7 +512,7 @@ class SYSNet:
         
         self.logger.info(
             f'found best l1_alpha {best_l1_alpha} in {time()-self.t0:.3f} sec')
-        exit()
+        sys.exit()
 
     def tar_models(self, path_models, model_fmt='model_*_*', tarfile_name='models.tar.gz'):
         """ Tar all models to reduce the number of outputs """
@@ -558,3 +560,23 @@ class SYSNetSnapshot(SYSNet):
             testloss_ensemble.append(test_loss_)
             
         return testloss_ensemble, hpix_, torch.cat(pred_ensemble, 1)
+
+    
+class TrainedModel:
+    
+    def __init__(self, model, checkpoint, pid, nnstruct=(4, 20), num_features=17):
+        
+        self.DNNx = src.init_model(model)
+        self.dnnx = self.DNNx(*nnstruct, input_dim=num_features)
+        self.pid = pid
+        checkpoint = src.load_checkpoint(checkpoint, self.dnnx)
+        
+    def forward(self, inmetrics, indata):
+        stats = np.load(inmetrics, allow_pickle=True)['stats'].item()
+        dl = src.load_data(indata, stats[self.pid])
+        
+        result = src.forward(self.dnnx, dl, {'device':'cpu'})
+        hpix = result[0].numpy()            
+        nnw = result[1].numpy().flatten()
+        #return Table([hpix, nnw], names=['hpix', 'weight'])
+        return (hpix, nnw)

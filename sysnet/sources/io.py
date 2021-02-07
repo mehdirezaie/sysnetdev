@@ -417,3 +417,13 @@ class MyDataSet(Dataset):
 
     def __len__(self):
         return len(self.x)
+    
+    
+def load_data(fitsfile, stats):
+    templates = ft.read(fitsfile)
+    img_data = ImagingData(templates, stats)        
+    return DataLoader(MyDataSet(img_data.x, img_data.y, img_data.p, img_data.w),
+                         batch_size=4098, shuffle=False, num_workers=0)
+
+    
+

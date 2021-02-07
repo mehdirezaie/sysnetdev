@@ -11,5 +11,4 @@ __pycache__
 *.so
 *.pt
 *.npz
-*.png
 *ipynb_checkpoints

@@ -213,7 +213,7 @@ pipeline.run()
 
 
 Check out the produce plot:
-![this image](../output/model_test/loss_vs_lr_0.png)
+![this image](output_0_1.png)
 
 Based on this plot, we should use the initial learning rate around 0.01.
 
@@ -304,13 +304,10 @@ pipeline.run()
 
 
 
-![png](output_13_1.png)
-
-
 This plot shows the training and validation loss vs epoch.
-![this image](../output/model_test/model_0_2664485226/loss_model_0_2664485226.png)
+![png](output_6_1.png)
 
-The baseline model returns 0.144 for the test loss, while the neural network is able to yield a lower value, 0.130.The validation loss is also not showing any sign of over-fitting. 
+The baseline model returns 0.144 for the test loss, while the neural network is able to yield a lower value, 0.134. The validation loss is also not showing any sign of over-fitting. 
 
 The code outputs several files:
 1. `nn-weights.fits`: this file has healpix index and predicted galaxy count
@@ -353,6 +350,6 @@ hp.mollview(ng_, rot=-85, min=0.5, max=2.0,
 ![png](output_17_1.png)
 
 
-For 30 training epochs, a single fold, and a single chain model, this is not a bad result. In practice, we use 5-fold validation (`do_kfold=True`) and train 20 chains (`nchains=20`) for70-300 epochs.
+For 30 training epochs, a single fold, and a single chain model, this is not a bad result. In practice, we use 5-fold validation (`do_kfold=True`) and train 20 chains (`nchains=20`) for 70-300 epochs.
 
 If you have any questions, feel free to email me at mr095415@ohio.edu.

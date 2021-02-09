@@ -77,19 +77,22 @@ class Config:
 
     def fetch(self, key, default):
         return getattr(self, key, default)
+    
+    def update(self, key, value):
+        setattr(self, key, value)
 
 def read_config_yml(path_yml):
     with open(path_yml, 'r') as f:
         conf = yaml.safe_load(f.read())
         return conf
 
-def save_checkpoint(state, checkpoint):
+def save_checkpoint(state, checkpoint, name='best.pth.tar'):
     """Saves model and training parameters at checkpoint + 'best.pth.tar'.
     Args:
         state: (dict) contains model's state_dict, may contain other keys such as epoch, optimizer state_dict
         checkpoint: (string) folder where parameters are to be saved
     """
-    filepath = os.path.join(checkpoint, 'best.pth.tar')
+    filepath = os.path.join(checkpoint, name)
     if not os.path.exists(checkpoint):
         os.mkdir(checkpoint)
     torch.save(state, filepath)
@@ -295,7 +298,7 @@ class MyDataLoader:
             dataloaders = {
                 s: DataLoader(datasets[s],
                               batch_size=batch_size,
-                              shuffle=True,
+                              shuffle=False,
                               num_workers=0)
                 for s in ['train', 'valid', 'test']
             }
@@ -414,3 +417,13 @@ class MyDataSet(Dataset):
 
     def __len__(self):
         return len(self.x)
+    
+    
+def load_data(fitsfile, stats):
+    templates = ft.read(fitsfile)
+    img_data = ImagingData(templates, stats)        
+    return DataLoader(MyDataSet(img_data.x, img_data.y, img_data.p, img_data.w),
+                         batch_size=4098, shuffle=False, num_workers=0)
+
+    
+

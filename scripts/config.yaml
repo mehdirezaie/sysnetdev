@@ -10,6 +10,7 @@ find_structure: False
 find_l1: False
 do_kfold: False 
 do_tar: False
+snapshot_ensemble: False
 normalization: 'z-score'
 model: dnn
 optim: adamw

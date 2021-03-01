@@ -12,7 +12,10 @@ We recommend Conda for installing the required packages:
 ```
 Then, clone the sysnetdev repository using `git clone https://github.com/mehdirezaie/sysnetdev.git` and add the path to the PYTHONPATH variable:
 
-`export PYTHONPATH=\path\to\sysnetdev:$PYTHONPATH`, you need to replace `\path\to\sysnetdev` with the path to sysnetdev in your system.
+`export PYTHONPATH=\path\to\sysnetdev:$PYTHONPATH`, you need to replace `\path\to\sysnetdev` with the path to sysnetdev in your system. Finally execute the following command in the terminal to add the sysnet kernel to your Jupyter notebook:
+```bash
+  python -m ipykernel install --user --name=sysnet --display-name "python (sysnet)"
+```
 
 ## Summary
 

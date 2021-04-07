@@ -195,7 +195,7 @@ class SYSNet:
         baseline_losses = src.compute_baseline_losses(dataloaders, loss_fn)
         
         for sample, base_loss in baseline_losses.items():
-            self.logger.info(f'{sample}: {base_loss:.3f}')
+            self.logger.info(f'{sample}: {base_loss:.6f}')
             
         return {**stats, **baseline_losses}
 

@@ -321,6 +321,7 @@ class MyDataLoader:
     def __read_fits(self, fits_file):
         # ('label', 'hpix', 'features', 'fracgood')
         self.df = ft.read(fits_file)
+        print('# of data:, ', self.df.size)
         if self.do_kfold:
             return self.__split2Kfolds(self.df,
                                        k=5,

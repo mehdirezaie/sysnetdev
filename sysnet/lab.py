@@ -551,6 +551,7 @@ class SYSNetSnapshot(SYSNet):
         snapshots = glob(os.path.join(snapshot_path, 'snapshot_*.pth.tar'))
         
         self.logger.info(f"Restoring parameters from {len(snapshots)} snapshots")
+        if len(snapshots) == 0:sys.exit(f'Something is wrong. there is no snapshots.')
         
         pred_ensemble = []
         testloss_ensemble = []

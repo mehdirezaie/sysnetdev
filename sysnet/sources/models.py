@@ -17,6 +17,8 @@ def init_model(model):
         return DNN
     elif model == 'dnnp':
         return DNNPoisson
+    elif model == 'dnnps':
+        return DNNPseudoP
     elif model == 'lin':
         return LinearNet
     elif model == 'linp':
@@ -89,15 +91,29 @@ class DNNPoisson(DNN):
     def forward(self, x):
         x = super(DNNPoisson, self).forward(x)
         return F.softplus(x, threshold=1000)
-        #for i in range(self.nb_layers):
-        #    if i == self.nb_layers-1:
-        #        x = self.fc[i](x)
-        #        x = F.softplus(x, threshold=1000)
-        #    else:
-        #        x = F.relu(self.fc[i](x))
-        #        x = self.bn[i](x)
-        #return x
 
+
+class DNNPseudoP(DNN):
+    '''
+    credit: https://discuss.pytorch.org/u/matthew_zeng/
+
+    TODO: take a list of hidden layer neurons
+
+    examples
+    ---------
+    a = DNNPPoisson(3, 100, 500, 500)
+    input = Variable(torch.Tensor(10, 500))
+    output = a(input)
+    '''
+
+    def __init__(self, nb_layers, nb_units, input_dim=18, output_dim=1, seed=42):
+        super(DNNPseudoP, self).__init__(nb_layers, nb_units,
+                                         input_dim=input_dim, output_dim=output_dim,
+                                         seed=seed)
+
+    def forward(self, x):
+        x = super(DNNPseudoP, self).forward(x)
+        return torch.exp(x)
 
 class LinearNet(nn.Module):
 

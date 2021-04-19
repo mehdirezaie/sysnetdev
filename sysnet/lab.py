@@ -323,10 +323,12 @@ class SYSNet:
         return predictions
     
     def get_structure(self, input_dim):
-        if self.config.model in ['dnn', 'dnnp']:
+        if self.config.model in ['dnn', 'dnnp', 'dnnps']:
             return (*self.config.nn_structure, input_dim, 1)
-        else:
+        elif self.config.model in ['lin', 'linp']:
             return (input_dim, 1)
+        else:
+            raise ValueError(f'{self.config.model} is not defined.')
 
 
     def tune_hyperparams(self, dataloaders, nn_structure, partition_id):
@@ -419,7 +421,7 @@ class SYSNet:
         """
         self.logger.info('# running learning rate finder ... ')
         lrfig_path = self.lrfig_path_fn(partition_id)
-
+        
         model = self.Model(*nn_structure)
         optimizer = self.Optim(params=model.parameters(),
                               lr=1.0e-7, **self.config.optim_kwargs)

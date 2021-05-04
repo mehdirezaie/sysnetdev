@@ -135,13 +135,13 @@ class SYSNetCollector:
                        }
         self.pred = []
         self.hpix = []
-        self.key = 0
 
     def start(self):
         self.train_losses = []
         self.valid_losses = []
         self.test_losses = []
         self.pred_list = []
+        self.base_losses = []
 
     def collect_chain(self, train_val_losses, test_loss, pred_):
         self.train_losses.append(train_val_losses[1])
@@ -149,14 +149,13 @@ class SYSNetCollector:
         self.test_losses.append(test_loss)
         self.pred_list.append(pred_)
 
-    def finish(self, stats, hpix):
-        self.stats[self.key] = stats
+    def finish(self, base_losses, hpix):
+        self.base_losses.append(base_losses)
         self.hpix.append(hpix)
         self.losses['train'].append(self.train_losses)
         self.losses['valid'].append(self.valid_losses)
         self.losses['test'].append(self.test_losses)
         self.pred.append(torch.cat(self.pred_list, 1))
-        self.key += 1
 
     def save(self, weights_path, metrics_path, nside=None):
         """ save metrics and predictions """
@@ -176,7 +175,7 @@ class SYSNetCollector:
         weights['weight'] = pred
 
         ft.write(weights_path, weights, clobber=True)
-        np.savez(metrics_path, stats=self.stats, losses=self.losses)
+        np.savez(metrics_path, base_losses=self.base_losses, losses=self.losses)
 
         # --- MR: how about we save as json? e.g.,
         # with open(output_path, 'w') as output_file:
@@ -293,7 +292,8 @@ class MyDataLoader:
         }
 
         if batch_size==-1:
-            return datasets, stats
+            datasets['stats'] = stats
+            return datasets#, stats
         else:
             dataloaders = {
                 s: DataLoader(datasets[s],
@@ -302,7 +302,8 @@ class MyDataLoader:
                               num_workers=0) # it was 0
                 for s in ['train', 'valid', 'test']
             }
-            return dataloaders, stats
+            dataloaders['stats'] = stats
+            return dataloaders#, stats
 
     def __read_npy(self, npy_file):
         ''' old npy file i.e., already split into 5 folds

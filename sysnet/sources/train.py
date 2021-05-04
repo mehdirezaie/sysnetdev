@@ -247,7 +247,8 @@ def train_and_eval(model, optimizer, loss_fn, dataloaders, params,
                                      'state_dict': copy.deepcopy(model.state_dict()),
                                      'optim_dict': copy.deepcopy(optimizer.state_dict()),
                                      'scheduler_dict': copy.deepcopy(scheduler.state_dict()),
-                                     'best_val_loss': valid_loss},
+                                     'best_val_loss': valid_loss,
+                                     'stats':dataloaders['stats']},
                                       checkpoint=checkpoint_path,
                                       name=f'snapshot_{epoch}.pth.tar')                                                 
                     
@@ -276,7 +277,8 @@ def train_and_eval(model, optimizer, loss_fn, dataloaders, params,
                          'state_dict': best_model_wts,
                          'optim_dict': optim_state,
                          'scheduler_dict': scheduler_state,
-                         'best_val_loss': best_val_loss},
+                         'best_val_loss': best_val_loss,
+                         'stats':dataloaders['stats']},
                         checkpoint=checkpoint_path)
         #logging.info(f'saved best model at {checkpoint_path}')
 
@@ -371,11 +373,11 @@ def compute_baseline_losses(dataloaders, loss_fn):
     
     baseline_losses = {}
     
-    for sample, dataloader in dataloaders.items():
+    for sample in ['train', 'valid', 'test']:
         
         base_loss = RunningAverage()
         
-        for _, target, fpix, _ in dataloader:
+        for _, target, fpix, _ in dataloaders[sample]:
             loss_ = loss_fn(pred_*fpix, target)
             base_loss.update(loss_, target.size(0))
         

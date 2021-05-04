@@ -171,17 +171,15 @@ class SYSNet:
             
             self.logger.info(f'partition_{partition_id} with {nn_structure}')
 
-            dataloaders, stats = self.ld.load_data(batch_size=self.config.batch_size,
+            dataloaders = self.ld.load_data(batch_size=self.config.batch_size,
                                                    partition_id=partition_id,
                                                    normalization=self.config.normalization,
                                                    axes=axes)
             
-            stats = self.add_base_losses(stats, dataloaders)
 
             self.tune_hyperparams(dataloaders, nn_structure, partition_id)
 
-            self.train_and_eval_chains(
-                dataloaders, nn_structure, partition_id, stats)  # for 'nchains' times
+            self.train_and_eval_chains(dataloaders, nn_structure, partition_id)  # for 'nchains' times
 
         self.logger.info(f'wrote weights: {self.weights_path}')
         self.logger.info(f'wrote metrics: {self.metrics_path}')
@@ -189,7 +187,7 @@ class SYSNet:
         if self.config.do_tar:
             self.tar_models(self.config.output_path)
 
-    def add_base_losses(self, stats, dataloaders):
+    def get_base_losses(self, dataloaders):
         
         loss_fn = self.Loss(**self.config.loss_kwargs)
         baseline_losses = src.compute_baseline_losses(dataloaders, loss_fn)
@@ -197,9 +195,9 @@ class SYSNet:
         for sample, base_loss in baseline_losses.items():
             self.logger.info(f'{sample}: {base_loss:.6f}')
             
-        return {**stats, **baseline_losses}
+        return baseline_losses
 
-    def train_and_eval_chains(self, dataloaders, nn_structure, partition_id, stats):
+    def train_and_eval_chains(self, dataloaders, nn_structure, partition_id):
         """
         Train and evaluate for 'nchain' times
 
@@ -211,31 +209,25 @@ class SYSNet:
             i.e., (# units, # hidden layers, # input layer units, # output unit)
         partition_id : int
 
-        stats : dict
-            stats of features and label, and losses of baseline model
-
         """
         np.random.seed(__global_seed__)
         seeds = np.random.randint(0, __seed_max__, size=self.config.nchains)
 
         self.collector.start()
+        base_losses = self.get_base_losses(dataloaders)
 
         for chain_id in range(self.config.nchains):
 
             seed = seeds[chain_id]
-            self.logger.info(
-                f'# running training and evaluation with seed: {seed}')
+            self.logger.info(f'# running training and evaluation with seed: {seed}')
 
-            train_val_losses = self.train(
-                dataloaders, nn_structure, seed, partition_id, stats)
+            train_val_losses = self.train(dataloaders, nn_structure, seed, partition_id)
 
             restore_path = self.restore_path_fn(partition_id, seed)
-            test_loss, hpix, pred_ = self.evaluate(
-                dataloaders['test'], nn_structure, restore_path)
+            test_loss, hpix, pred_ = self.evaluate(dataloaders['test'], nn_structure, restore_path)
             
             if isinstance(test_loss, list):                
-                self.logger.info(
-                    f'best val loss: {train_val_losses[0]:.6f}, (mean) test loss: {np.mean(test_loss):.6f}')
+                self.logger.info(f'best val loss: {train_val_losses[0]:.6f}, (mean) test loss: {np.mean(test_loss):.6f}')
             else:
                 self.logger.info(
                     f'best val loss: {train_val_losses[0]:.6f}, test loss: {test_loss:.6f}')
@@ -243,9 +235,9 @@ class SYSNet:
             self.collector.collect_chain(train_val_losses, test_loss, pred_)
 
 
-        self.collector.finish(stats, hpix)
+        self.collector.finish(base_losses, hpix)
 
-    def train(self, dataloaders, nn_structure, seed, partition_id, stats):
+    def train(self, dataloaders, nn_structure, seed, partition_id):
         """
         Train and evaluate a nn on training and validation sets
 
@@ -256,7 +248,6 @@ class SYSNet:
         nn_structure : (tuple of int)
         seed : (int)
         partition_id : (int)
-        stats : (dict)
 
         returns
         -------
@@ -280,9 +271,8 @@ class SYSNet:
                                     checkpoint_path=checkpoint_path, scheduler=scheduler,
                                     restore_model=self.config.restore_model, return_losses=True,
                                     snapshot_ensemble=self.config.snapshot_ensemble)
-        self.plot_losses(losses, stats, lossfig_path)
-        self.logger.info(
-            f'finished training in {time()-self.t0:.3f} sec, checkout {lossfig_path}')
+        self.plot_losses(losses, lossfig_path)
+        self.logger.info(f'finished training in {time()-self.t0:.3f} sec, checkout {lossfig_path}')
         return losses
 
     def evaluate(self, dataloader, nn_structure, restore_path):
@@ -317,8 +307,7 @@ class SYSNet:
         model = model.to(params['device'])
         loss_fn = self.Loss(**self.config.loss_kwargs)
 
-        predictions = src.evaluate(
-            model, loss_fn, dataloader, params, return_ypred=True)
+        predictions = src.evaluate(model, loss_fn, dataloader, params, return_ypred=True)
         # self.logger.info(f'finish evaluation in {time()-self.t0:.3f} sec')
         return predictions
     
@@ -400,10 +389,8 @@ class SYSNet:
                       (6, 20, num_features, num_output)]
 
         loss_fn = self.Loss(**self.config.loss_kwargs)
-        best_structure = src.tune_model_structure(
-            self.Model, self.Optim, dataloaders, loss_fn, structures, params)
-        self.logger.info(
-            f'found best structure {best_structure} in {time()-self.t0:.3f} sec')
+        best_structure = src.tune_model_structure(self.Model, self.Optim, dataloaders, loss_fn, structures, params)
+        self.logger.info(f'found best structure {best_structure} in {time()-self.t0:.3f} sec')
         sys.exit()
 
     def find_lr(self, train_dataloader, nn_structure, partition_id):
@@ -424,14 +411,12 @@ class SYSNet:
         optimizer = self.Optim(params=model.parameters(),
                               lr=1.0e-7, **self.config.optim_kwargs)
         loss_fn = self.Loss(**self.config.loss_kwargs)
-        lr_finder = src.LRFinder(
-            model, optimizer, loss_fn, device=self.config.device)
+        lr_finder = src.LRFinder(model, optimizer, loss_fn, device=self.config.device)
         lr_finder.range_test(train_dataloader, end_lr=1, num_iter=300)
         lr_finder.plot(lrfig_path=lrfig_path)
         lr_finder.reset()
 
-        sys.exit(
-            f'LR finder done in {time()-self.t0:.3f} sec, check out {lrfig_path}')
+        sys.exit(f'LR finder done in {time()-self.t0:.3f} sec, check out {lrfig_path}')
 
     def run_rfe(self, axes):
         """ Runs Recursive Feature Selection """
@@ -462,7 +447,7 @@ class SYSNet:
         else:
             return self.config.axes
 
-    def plot_losses(self, losses, stats, lossfig_path):
+    def plot_losses(self, losses, lossfig_path):
         """ Plots loss vs epochs for training and validation """
         __, train_losses, val_losses = losses
         plt.figure()
@@ -472,9 +457,9 @@ class SYSNet:
         c = ['r', 'k']
         ls = ['--', '-']
 
-        for i, baseline in enumerate(['base_valid_loss', 'base_train_loss']):
-            if baseline in stats:
-                plt.axhline(stats[baseline], c=c[i], ls=':', lw=1)
+        #for i, baseline in enumerate(['base_valid_loss', 'base_train_loss']):
+        #    if baseline in baseline_losses:
+        #        plt.axhline(baseline_losses[baseline], c=c[i], ls=':', lw=1)
 
         plt.legend()
         plt.ylabel(self.config.loss.upper())  # MSE or NPLL
@@ -507,11 +492,9 @@ class SYSNet:
 
         model = self.Model(*nn_structure, seed=params['seed'])
         loss_fn = self.Loss(**self.config.loss_kwargs)
-        best_l1_alpha = src.tune_l1_scale(
-            model, self.Optim, dataloaders, loss_fn, l1_alphas, params)
+        best_l1_alpha = src.tune_l1_scale(model, self.Optim, dataloaders, loss_fn, l1_alphas, params)
         
-        self.logger.info(
-            f'found best l1_alpha {best_l1_alpha} in {time()-self.t0:.3f} sec')
+        self.logger.info(f'found best l1_alpha {best_l1_alpha} in {time()-self.t0:.3f} sec')
         sys.exit()
 
     def tar_models(self, path_models, model_fmt='model_*_*', tarfile_name='models.tar.gz'):

@@ -299,7 +299,7 @@ class MyDataLoader:
                 s: DataLoader(datasets[s],
                               batch_size=batch_size,
                               shuffle=False,
-                              num_workers=4) # it was 0
+                              num_workers=0) # it was 0
                 for s in ['train', 'valid', 'test']
             }
             return dataloaders, stats

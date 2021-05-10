@@ -545,19 +545,18 @@ class SYSNetSnapshot(SYSNet):
             
         return testloss_ensemble, hpix_, torch.cat(pred_ensemble, 1)
 
-    
+
 class TrainedModel:
     
-    def __init__(self, model, checkpoint, pid, nnstruct=(4, 20), num_features=17):
+    def __init__(self, model, checkpoint, nnstruct=(4, 20), num_features=17):
         
         self.DNNx = src.init_model(model)
         self.dnnx = self.DNNx(*nnstruct, input_dim=num_features)
-        self.pid = pid
         checkpoint = src.load_checkpoint(checkpoint, self.dnnx)
+        self.stats =  checkpoint['stats']
         
-    def forward(self, inmetrics, indata):
-        stats = np.load(inmetrics, allow_pickle=True)['stats'].item()
-        dl = src.load_data(indata, stats[self.pid])
+    def forward(self, indata):
+        dl = src.load_data(indata, self.stats)
         
         result = src.forward(self.dnnx, dl, {'device':'cpu'})
         hpix = result[0].numpy()            

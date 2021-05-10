@@ -15,7 +15,7 @@ Core developers: Mehdi Rezaie, Reza Katebi
 
 Demo
 =====
-For installation and running the pipeline, check out [this demo](https://github.com/mehdirezaie/sysnetdev/blob/master/docs/demo/decals_dr7.md).
+For installation and a demo of SYSNet, check out [this demo](https://nbviewer.jupyter.org/github/mehdirezaie/sysnetdev/blob/master/notebooks/demo_decalsdr7.ipynb).
 
 Build Status
 ============

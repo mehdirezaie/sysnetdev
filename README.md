@@ -19,7 +19,7 @@ Here are the papers that would help understanding this code. Read them in this o
 3. Sections 1-3 from https://arxiv.org/pdf/1608.03983.pdf               
 4. Sections 1-3 from https://arxiv.org/pdf/1506.01186.pdf               
 
-If you have time and or are interested in learning more (order doesn't matter):
+If you have time and or are interested in learning more (order doesn't matter):   
 a. https://www.nature.com/articles/nature14539               
 b. https://arxiv.org/pdf/1502.03167.pdf               
 c. https://arxiv.org/pdf/1704.00109.pdf               

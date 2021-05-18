@@ -11,7 +11,19 @@ SYSNet: an end-to-end imaging systematics cleaning pipeline
 3. Different Cost functions: Mean Squared Error and Poisson Negative log-likelihood.
 4. Different Optimizers (e.g., SGD, AdamW, Adam)
 
-Core developers: Mehdi Rezaie, Reza Katebi
+Relevant Literature
+===================
+Here are the papers that would help understanding this code. Read them in this order:               
+1. Sections 1-3, 4.1, 4.6, 4.9, 4.10 from https://arxiv.org/pdf/1609.04747.pdf               
+2. Sections 2-3.2 from https://arxiv.org/pdf/1907.11355.pdf (if this is hard to follow, read this Medium article first: https://purnasaigudikandula.medium.com/a-beginner-intro-to-neural-networks-543267bda3c8)               
+3. Sections 1-3 from https://arxiv.org/pdf/1608.03983.pdf               
+4. Sections 1-3 from https://arxiv.org/pdf/1506.01186.pdf               
+
+If you have time and or are interested in learning more (order doesn't matter):   
+a. https://www.nature.com/articles/nature14539               
+b. https://arxiv.org/pdf/1502.03167.pdf               
+c. https://arxiv.org/pdf/1704.00109.pdf               
+
 
 Demo
 =====
@@ -26,3 +38,4 @@ We plan to perform integrated tests of the code, including all models in a minic
 
 Please email me at mr095415@ohio.edu if you encounter any issues.
 
+Core developers: Mehdi Rezaie, Reza Katebi

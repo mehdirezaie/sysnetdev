@@ -299,6 +299,7 @@ class MyDataLoader:
                 s: DataLoader(datasets[s],
                               batch_size=batch_size,
                               shuffle=False,
+                              drop_last=True, #https://discuss.pytorch.org/t/error-expected-more-than-1-value-per-channel-when-training/26274/4
                               num_workers=0) # it was 0
                 for s in ['train', 'valid', 'test']
             }
@@ -322,7 +323,7 @@ class MyDataLoader:
     def __read_fits(self, fits_file):
         # ('label', 'hpix', 'features', 'fracgood')
         self.df = ft.read(fits_file)
-        print('# of data:, ', self.df.size)
+        self.logger.info(f'# of data: {self.df.size}')
         if self.do_kfold:
             return self.__split2Kfolds(self.df,
                                        k=5,

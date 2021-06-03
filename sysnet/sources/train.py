@@ -106,7 +106,6 @@ def train(model, optimizer, loss_fn, dataloader, params, epoch, scheduler=None):
         fpix = fpix.to(params['device'])
 
         with torch.set_grad_enabled(True):  # only on training phase
-            
             optimizer.zero_grad()  # clear previous gradients
             output = model(data)
             loss = loss_fn(output*fpix, target)

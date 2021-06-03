@@ -164,7 +164,6 @@ class SYSNet:
         num_partitions = 5 if self.config.do_kfold else 1
 
         for partition_id in range(0, num_partitions):  # k-fold validation loop
-
             axes = self.axes_for_partition(partition_id)
             # if non-linear (# units, # hidden layers, # input layer units, # output unit)
             nn_structure = self.get_structure(len(axes))

@@ -298,8 +298,8 @@ class MyDataLoader:
             dataloaders = {
                 s: DataLoader(datasets[s],
                               batch_size=batch_size,
-                              shuffle=False,
-                              drop_last=True, #https://discuss.pytorch.org/t/error-expected-more-than-1-value-per-channel-when-training/26274/4
+                              shuffle=True,
+                              drop_last=False, #https://discuss.pytorch.org/t/error-expected-more-than-1-value-per-channel-when-training/26274/4
                               num_workers=0) # it was 0
                 for s in ['train', 'valid', 'test']
             }

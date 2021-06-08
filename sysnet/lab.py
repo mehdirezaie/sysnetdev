@@ -217,7 +217,7 @@ class SYSNet:
 
         for chain_id in range(self.config.nchains):
 
-            seed = seeds[chain_id]
+            seed = seeds[chain_id] + 1000
             self.logger.info(f'# running training and evaluation with seed: {seed}')
 
             train_val_losses = self.train(dataloaders, nn_structure, seed, partition_id)

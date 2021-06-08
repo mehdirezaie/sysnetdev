@@ -9,7 +9,7 @@
     December 2020
 """
 import sysnet
-
+raise RuntimeError('dataloader with shuffle=True causes buggy outputs.')
 debug = False
 if debug:
     sysnet.detect_anomaly() # this will slow down

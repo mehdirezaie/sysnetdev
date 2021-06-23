@@ -295,10 +295,11 @@ class MyDataLoader:
             datasets['stats'] = stats
             return datasets#, stats
         else:
+            shuffle_kw = dict(train=True, valid=True, test=False)
             dataloaders = {
                 s: DataLoader(datasets[s],
                               batch_size=batch_size,
-                              shuffle=True,
+                              shuffle=shuffle_kw[s],
                               drop_last=False, #https://discuss.pytorch.org/t/error-expected-more-than-1-value-per-channel-when-training/26274/4
                               num_workers=0) # it was 0
                 for s in ['train', 'valid', 'test']

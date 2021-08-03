@@ -27,3 +27,4 @@ nn_structure:
   - 20
 l1_alpha: -1.0  
 loss: mse
+no_eval: False

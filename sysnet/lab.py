@@ -180,11 +180,12 @@ class SYSNet:
 
             self.train_and_eval_chains(dataloaders, nn_structure, partition_id)  # for 'nchains' times
 
-        self.logger.info(f'wrote weights: {self.weights_path}')
-        self.logger.info(f'wrote metrics: {self.metrics_path}')
-        self.collector.save(self.weights_path, self.metrics_path)
-        if self.config.do_tar:
-            self.tar_models(self.config.output_path)
+        if not self.config.no_eval:
+            self.logger.info(f'wrote weights: {self.weights_path}')
+            self.logger.info(f'wrote metrics: {self.metrics_path}')
+            self.collector.save(self.weights_path, self.metrics_path)
+            if self.config.do_tar:
+                self.tar_models(self.config.output_path)
 
     def get_base_losses(self, dataloaders):
         
@@ -221,20 +222,22 @@ class SYSNet:
             self.logger.info(f'# running training and evaluation with seed: {seed}')
 
             train_val_losses = self.train(dataloaders, nn_structure, seed, partition_id)
-
-            restore_path = self.restore_path_fn(partition_id, seed)
-            test_loss, hpix, pred_ = self.evaluate(dataloaders['test'], nn_structure, restore_path)
             
-            if isinstance(test_loss, list):                
-                self.logger.info(f'best val loss: {train_val_losses[0]:.6f}, (mean) test loss: {np.mean(test_loss):.6f}')
-            else:
-                self.logger.info(
-                    f'best val loss: {train_val_losses[0]:.6f}, test loss: {test_loss:.6f}')
+            if not self.config.no_eval:
                 
-            self.collector.collect_chain(train_val_losses, test_loss, pred_)
+                restore_path = self.restore_path_fn(partition_id, seed)
+                test_loss, hpix, pred_ = self.evaluate(dataloaders['test'], nn_structure, restore_path)
+                
+                if isinstance(test_loss, list):                
+                    self.logger.info(f'best val loss: {train_val_losses[0]:.6f}, (mean) test loss: {np.mean(test_loss):.6f}')
+                else:
+                    self.logger.info(
+                        f'best val loss: {train_val_losses[0]:.6f}, test loss: {test_loss:.6f}')
+                    
+                self.collector.collect_chain(train_val_losses, test_loss, pred_)
 
-
-        self.collector.finish(base_losses, hpix)
+        if not self.config.no_eval:
+            self.collector.finish(base_losses, hpix)
 
     def train(self, dataloaders, nn_structure, seed, partition_id):
         """

@@ -24,7 +24,7 @@ matplotlib.use('Agg')
 # set some global variables which do not change
 __logger_level__ = 'info'  # info, debug, or warning
 __global_seed__ = 85
-__nepochs_hyperparams__ = 20
+__nepochs_hyperparams__ = 50
 __seed_max__ = 4294967295  # i.e., 2**32 - 1, maximum number in numpy
 
 

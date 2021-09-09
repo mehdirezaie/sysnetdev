@@ -125,5 +125,9 @@ def parse_cmd_arguments(yaml_config=None):
                         type=str,
                         default=cf.fetch('loss', 'pnll'),
                         help='Cost function (loss) e.g., mse, pnll')
+    ap.add_argument('--no_eval',
+                        default=cf.fetch('no_eval', False),
+                        action='store_true',
+                        help='perform evaluation on test set')
 
     return ap.parse_args()

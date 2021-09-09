@@ -9,12 +9,11 @@
     December 2020
 """
 import sysnet
-raise RuntimeError('dataloader with shuffle=True causes buggy outputs.')
 debug = False
 if debug:
     sysnet.detect_anomaly() # this will slow down
 
 config = sysnet.parse_cmd_arguments('config.yaml')
 pipeline = sysnet.SYSNetSnapshot(config)
-pipeline.config.scheduler_kwargs.update(T_0=10, T_mult=1)  # FIXME: it does not show up in the log!
+pipeline.config.scheduler_kwargs.update(T_0=20, T_mult=1)  # FIXME: it does not show up in the log!
 pipeline.run()

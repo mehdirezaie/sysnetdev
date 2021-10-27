@@ -135,14 +135,15 @@ class SYSNetCollector:
                        }
         self.pred = []
         self.hpix = []
+        self.base_losses = []
+
 
     def start(self):
         self.train_losses = []
         self.valid_losses = []
         self.test_losses = []
         self.pred_list = []
-        self.base_losses = []
-
+        
     def collect_chain(self, train_val_losses, test_loss, pred_):
         self.train_losses.append(train_val_losses[1])
         self.valid_losses.append(train_val_losses[2])

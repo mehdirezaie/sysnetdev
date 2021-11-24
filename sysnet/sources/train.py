@@ -109,7 +109,8 @@ def train(model, optimizer, loss_fn, dataloader, params, epoch, scheduler=None):
             optimizer.zero_grad()  # clear previous gradients
             output = model(data)
             loss = loss_fn(output*fpix, target)
-            
+            loss = loss*fpix
+            loss = loss.sum()     # since reduction is set to 'none'
             if params['l1_alpha'] > 0.0: # do L1 regularization if l1 alpha is positive
                 l1loss = l1_loss(model)
                 loss_tot = loss + params['l1_alpha']*l1loss
@@ -145,8 +146,8 @@ def evaluate(model, loss_fn, dataloader, params, return_ypred=False):
 
             output = model(data)
             loss = loss_fn(output*fpix, target)
-
-            loss_avg.update(loss, data.size(0))
+            loss = loss*fpix
+            loss_avg.update(loss.sum(), data.size(0))
 
             if return_ypred:
                 list_hpix.append(hpix)
@@ -378,7 +379,8 @@ def compute_baseline_losses(dataloaders, loss_fn):
         
         for _, target, fpix, _ in dataloaders[sample]:
             loss_ = loss_fn(pred_*fpix, target)
-            base_loss.update(loss_, target.size(0))
+            loss_ = loss_*fpix
+            base_loss.update(loss_.sum(), target.size(0))
         
         baseline_losses[f'base_{sample}_loss'] = base_loss().item()
     

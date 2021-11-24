@@ -135,14 +135,15 @@ class SYSNetCollector:
                        }
         self.pred = []
         self.hpix = []
+        self.base_losses = []
+
 
     def start(self):
         self.train_losses = []
         self.valid_losses = []
         self.test_losses = []
         self.pred_list = []
-        self.base_losses = []
-
+        
     def collect_chain(self, train_val_losses, test_loss, pred_):
         self.train_losses.append(train_val_losses[1])
         self.valid_losses.append(train_val_losses[2])
@@ -423,11 +424,8 @@ class MyDataSet(Dataset):
         return len(self.x)
     
     
-def load_data(fitsfile, stats):
+def load_data(fitsfile, stats, axes):
     templates = ft.read(fitsfile)
-    img_data = ImagingData(templates, stats)        
+    img_data = ImagingData(templates, stats, axes=axes)        
     return DataLoader(MyDataSet(img_data.x, img_data.y, img_data.p, img_data.w),
                          batch_size=4098, shuffle=False, num_workers=0)
-
-    
-

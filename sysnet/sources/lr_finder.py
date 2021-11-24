@@ -275,6 +275,7 @@ class LRFinder(object):
             # Forward pass
             outputs = self.model(inputs)
             loss = self.criterion(outputs, labels)
+            loss = loss.sum()
 
             # Loss should be averaged in each step
             loss /= accumulation_steps
@@ -335,6 +336,7 @@ class LRFinder(object):
                 # Forward pass and loss computation
                 outputs = self.model(inputs)
                 loss = self.criterion(outputs, labels)
+                loss = loss.sum()
                 running_loss += loss.item() * batch_size
 
         return running_loss / len(dataloader.dataset)

@@ -25,6 +25,13 @@ b. https://arxiv.org/pdf/1502.03167.pdf
 c. https://arxiv.org/pdf/1704.00109.pdf               
 
 
+Quick Setup
+===========
+Clone the repository with `git clone https://github.com/mehdirezaie/sysnetdev.git`, and then add the (absolute) path to PYTHONPATH:
+```bash
+export PYTHONPATH=/Users/rezaie/github/sysnetdev:$PYTHONPATH
+```
+
 Demo
 =====
 For installation and a demo of SYSNet, check out [this demo](https://nbviewer.jupyter.org/github/mehdirezaie/sysnetdev/blob/master/notebooks/demo_decalsdr7.ipynb).

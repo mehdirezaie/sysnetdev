@@ -12,7 +12,7 @@ do_kfold: False
 do_tar: False
 snapshot_ensemble: False
 normalization: 'z-score'
-model: dnn
+model: dnnp
 optim: adamw
 scheduler: cosann
 axes: 
@@ -26,5 +26,5 @@ nn_structure:
   - 4
   - 20
 l1_alpha: -1.0  
-loss: mse
+loss: pnll
 no_eval: False

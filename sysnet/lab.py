@@ -559,8 +559,8 @@ class TrainedModel:
         checkpoint = src.load_checkpoint(checkpoint, self.dnnx)
         self.stats =  checkpoint['stats']
         
-    def forward(self, indata):
-        dl = src.load_data(indata, self.stats)
+    def forward(self, indata, axes):
+        dl = src.load_data(indata, self.stats, axes)
         
         result = src.forward(self.dnnx, dl, {'device':'cpu'})
         hpix = result[0].numpy()            

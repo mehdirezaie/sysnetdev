@@ -90,7 +90,7 @@ class DNNPoisson(DNN):
 
     def forward(self, x):
         x = super(DNNPoisson, self).forward(x)
-        return F.softplus(x, threshold=1000)
+        return F.softplus(x)
 
 
 class DNNPseudoP(DNN):
@@ -133,7 +133,7 @@ class LinearPoisson(LinearNet):
 
     def forward(self, x):
         x = super(LinearPoisson, self).forward(x)
-        return F.softplus(x, threshold=1000)
+        return F.softplus(x)
 
 
 

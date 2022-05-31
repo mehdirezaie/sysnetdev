@@ -333,7 +333,7 @@ class MyDataLoader:
         assert np.all(np.isfinite(ng_))
         self.logger.info(f' min n max label: {np.percentile(ng_, [0, 100])}')
         self.df['label'] = ng_
-        self.df['fracgood'] = 1.0 # FIXME: mocks are not subsampled 
+        self.df['fracgood'] = 1.0 # NOTE: mocks are not subsampled, and thus frac=1
         self.logger.info(f'# of data: {self.df.size}')
         if self.do_kfold:
             return self.__split2Kfolds(self.df,

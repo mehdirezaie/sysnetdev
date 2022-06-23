@@ -233,6 +233,7 @@ class MyDataLoader:
         if len(input_file) == 2:
             self.df_split = self.__read_2fits(input_file)
         else:
+            input_file = input_file[0]
             if input_file.endswith('.fits'):
                 self.df_split = self.__read_fits(input_file)
             elif input_file.endswith('.npy'):

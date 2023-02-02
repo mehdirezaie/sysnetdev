@@ -203,8 +203,7 @@ def check_io(input_path, output_path):
 
     args:
         input_path: str, path to the input file
-        output_path: str, path to the output file 
-
+        output_path: str, path to the output file
     """
     # check input and output
     if not os.path.exists(input_path):
@@ -334,7 +333,7 @@ class MyDataLoader:
         # ('label', 'hpix', 'features', 'fracgood')
         self.df = ft.read(fits_file[0])
         ng_ = read_map(fits_file[1])[self.df['hpix']]
-        assert np.all(np.isfinite(ng_))
+        assert np.all(np.isfinite(ng_) & (ng_ != hp.UNSEEN))
         self.logger.info(f' min n max label: {np.percentile(ng_, [0, 100])}')
         self.df['label'] = ng_
         self.df['fracgood'] = 1.0 # NOTE: mocks are not subsampled, and thus frac=1
@@ -363,8 +362,7 @@ class MyDataLoader:
         '''
             split data into k randomly chosen regions
             for training, validation and testing
-
-
+            
             data
             |__ 0
             |   |__ train

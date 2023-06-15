@@ -203,8 +203,7 @@ def check_io(input_path, output_path):
 
     args:
         input_path: str, path to the input file
-        output_path: str, path to the output file 
-
+        output_path: str, path to the output file
     """
     # check input and output
     if not os.path.exists(input_path):
@@ -230,10 +229,17 @@ class MyDataLoader:
         self.seed = seed
         self.do_kfold = do_kfold
 
-        if input_file.endswith('.fits'):
-            self.df_split = self.__read_fits(input_file)
-        elif input_file.endswith('.npy'):
-            self.df_split = self.__read_npy(input_file)
+        if len(input_file) == 2:
+            self.df_split = self.__read_2fits(input_file)
+        else:
+            if type(input_file) == list:
+                input_file = input_file[0]
+            if input_file.endswith('.fits'):
+                self.df_split = self.__read_fits(input_file)
+            elif input_file.endswith('.npy'):
+                self.df_split = self.__read_npy(input_file)
+            else:
+                print("unknown input")
 
     def load_data(self, batch_size=1024,
                   partition_id=0, normalization='z-score',
@@ -322,6 +328,24 @@ class MyDataLoader:
         else:
             return df[0]
 
+    def __read_2fits(self, fits_file):
+        from healpy import read_map
+        # ('label', 'hpix', 'features', 'fracgood')
+        self.df = ft.read(fits_file[0])
+        ng_ = read_map(fits_file[1])[self.df['hpix']]
+        assert np.all(np.isfinite(ng_) & (ng_ != hp.UNSEEN))
+        self.logger.info(f' min n max label: {np.percentile(ng_, [0, 100])}')
+        self.df['label'] = ng_
+        self.df['fracgood'] = 1.0 # NOTE: mocks are not subsampled, and thus frac=1
+        self.logger.info(f'# of data: {self.df.size}')
+        if self.do_kfold:
+            return self.__split2Kfolds(self.df,
+                                       k=5,
+                                       shuffle=True,
+                                       seed=self.seed)
+        else:
+            return self.__split(self.df, seed=self.seed)  # 5-fold
+
     def __read_fits(self, fits_file):
         # ('label', 'hpix', 'features', 'fracgood')
         self.df = ft.read(fits_file)
@@ -338,8 +362,7 @@ class MyDataLoader:
         '''
             split data into k randomly chosen regions
             for training, validation and testing
-
-
+            
             data
             |__ 0
             |   |__ train

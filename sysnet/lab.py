@@ -162,8 +162,8 @@ class SYSNet:
         """
         self.logger.info('# running pipeline ...')
         if self.config.do_rfe: # to do recursive feature elimination
-            raise RuntimeError('FIXME: data loading must be performed once')
             self.axes_from_rfe = self.run_rfe(self.config.axes)
+            sys.exit('rfe done...rerun the code without --do_rfe')
 
         self.logger.info('# training and evaluation')
         num_partitions = 5 if self.config.do_kfold else 1
@@ -429,16 +429,13 @@ class SYSNet:
 
     def run_rfe(self, axes):
         """ Runs Recursive Feature Selection """
-        raise NotImplementedError(
-            'the checkpoint cannot be loaded due to shape being not saved (data loading must be done once)')
         self.logger.info('# running rfe ...')
         axes_to_keep = {}
         model = src.LinearRegression(add_bias=True)
         num_partitions = 5 if self.config.do_kfold else 1
 
         for partition_id in range(num_partitions):
-            datasets, stats = self.ld.load_data(batch_size=-1, partition_id=partition_id,
-                                                loss_fn=self.Loss(**self.config.loss_kwargs))
+            datasets = self.ld.load_data(batch_size=-1, partition_id=partition_id)
             fs = src.FeatureElimination(model, datasets)
             fs.run(axes)
             # we only want the axes

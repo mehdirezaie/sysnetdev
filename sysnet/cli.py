@@ -10,6 +10,7 @@ def parse_cmd_arguments(yaml_config=None):
 
     ap.add_argument('-i', '--input_path',
                         type=str,
+                        nargs='*',
                         default=cf.fetch('input_path', '../input/eBOSS.ELG.NGC.DR7.table.fits'),
                         help='path to the input data')
 

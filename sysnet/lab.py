@@ -127,7 +127,11 @@ class SYSNet:
                                    do_kfold=self.config.do_kfold,
                                    seed=__global_seed__)
         if self.config.axes == ['all']:
-            self.config.axes = np.arange(self.ld.df_split[0]['features'].shape[1])
+            if self.config.do_kfold:
+                num_features = self.ld.df_split[0][0]['features'].shape[1]
+            else:
+                num_features = self.ld.df_split[0]['features'].shape[1]
+            self.config.axes = np.arange(num_features)
         else:
             self.config.axes = [int(i) for i in self.config.axes]
         self.logger.info(f'updated axes to {self.config.axes}')

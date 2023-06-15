@@ -126,6 +126,11 @@ class SYSNet:
         self.ld = src.MyDataLoader(self.config.input_path,
                                    do_kfold=self.config.do_kfold,
                                    seed=__global_seed__)
+        if self.config.axes == ['all']:
+            self.config.axes = np.arange(self.ld.df_split[0]['features'].shape[1])
+        else:
+            self.config.axes = [int(i) for i in self.config.axes]
+        self.logger.info(f'updated axes to {self.config.axes}')
         self.logger.info(f'data loaded in {time()-self.t0:.3f} sec')
 
         # ---- set the paths

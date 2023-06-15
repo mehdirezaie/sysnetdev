@@ -89,7 +89,6 @@ def parse_cmd_arguments(yaml_config=None):
                         help='cosann or none')
 
     ap.add_argument('-ax', '--axes',
-                        type=int,
                         nargs='*',
                         default=cf.fetch('axes', [0]),
                         #required=True,

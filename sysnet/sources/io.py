@@ -397,7 +397,7 @@ class ImagingData(object):
             # self.y = (self.y - stats['y'][0]) / stats['y'][1] # don't scale label
 
         if axes is not None:
-            self.x = self.x[:, axes]
+            self.x = self.x if axes[0]=='all' else self.x[:, axes]
 
         if add_bias:
             self.x = np.column_stack([np.ones(self.x.shape[0]), self.x])

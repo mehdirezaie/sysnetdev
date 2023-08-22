@@ -8,12 +8,16 @@
     Mehdi Rezaie, mr095415@ohio.edu
     October 2020
 """
-import sysnet
+def main(debug=False):
+    import sysnet
 
-debug = False
-if debug:
-    sysnet.detect_anomaly() # this will slow down
+    if debug:
+        sysnet.detect_anomaly() # this will slow down
 
-config = sysnet.parse_cmd_arguments('config.yaml')
-pipeline = sysnet.SYSNet(config)
-pipeline.run()
+    config = sysnet.parse_cmd_arguments('config.yaml')
+    pipeline = sysnet.SYSNet(config)
+    pipeline.run()
+
+if __name__ == '__main__':
+    
+    main()

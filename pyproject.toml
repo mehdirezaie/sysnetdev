@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[project]
+name = "sysnet"
+authors = [{name="Mehdi Rezaie", email="mr095415@ohio.edu"}, {name="Reza Katebi"}]
+description = "An end-to-end imaging systematics cleaning pipeline"
+version = "0.1.0"
+dependencies = ["numpy", "matplotlib", "fitsio", "healpy", "torch", "pyyaml", "scikit-learn"]
+readme = "README.md"
+requires-python = ">=3.7"
+urls = {Repository = "https://github.com/mehdirezaie/sysnetdev"}
+classifiers = ["Programming Language :: Python :: 3"]
+
+[project.scripts]
+sysnet-app = "scripts.app:main"
+
+[tool.setuptools]
+packages = ["sysnet"]

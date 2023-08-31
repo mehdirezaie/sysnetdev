@@ -1,8 +1,7 @@
-
 import logging
 import numpy as np
 
-from sysnet.sources import LinearRegression
+from .models import LinearRegression
 
 __all__ = ['FeatureElimination']
 

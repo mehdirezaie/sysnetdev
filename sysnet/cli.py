@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from sysnet.sources.io import Config
+from .sources.io import Config
 
 
 def parse_cmd_arguments(yaml_config=None):    

@@ -11,3 +11,11 @@ __pycache__
 *.pt
 *.npz
 *ipynb_checkpoints
+**/*.egg
+**/*.egg-info
+**/.cache
+**/.config
+**/.wget*
+**/dist
+**/eggs
+**/build

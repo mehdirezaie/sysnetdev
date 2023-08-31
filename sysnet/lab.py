@@ -15,7 +15,7 @@ from time import time
 from glob import glob
 
 import torch
-import sysnet.sources as src
+from . import sources as src
 
 import matplotlib
 matplotlib.use('Agg')

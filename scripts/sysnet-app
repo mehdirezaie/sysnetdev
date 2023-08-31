@@ -8,13 +8,17 @@
     Mehdi Rezaie, mr095415@ohio.edu
     October 2020
 """
-def main(debug=False):
+def main(debug=False, args=None):
+    import argparse
     import sysnet
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('config_fn', action='store', type=str, help='Name of configuration file')
+    args = parser.parse_args(args=args)
 
     if debug:
         sysnet.detect_anomaly() # this will slow down
 
-    config = sysnet.parse_cmd_arguments('config.yaml')
+    config = sysnet.parse_cmd_arguments(args.config_fn)
     pipeline = sysnet.SYSNet(config)
     pipeline.run()
 

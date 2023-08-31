@@ -1,7 +1,6 @@
-
-from .lab import SYSNet, SYSNetSnapshot, TrainedModel
-from .cli import parse_cmd_arguments
 from .sources.io import Config
+from .cli import parse_cmd_arguments
+from .lab import SYSNet, SYSNetSnapshot, TrainedModel
 
 
 def detect_anomaly():

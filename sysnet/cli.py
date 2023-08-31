@@ -11,12 +11,12 @@ def parse_cmd_arguments(yaml_config=None):
     ap.add_argument('-i', '--input_path',
                         type=str,
                         nargs='*',
-                        default=cf.fetch('input_path', '../input/eBOSS.ELG.NGC.DR7.table.fits'),
+                        default=cf.fetch('input_path', './input/eBOSS.ELG.NGC.DR7.table.fits'),
                         help='path to the input data')
 
     ap.add_argument('-o', '--output_path',
                         type=str,
-                        default=cf.fetch('output_path', '../output/model_test'),
+                        default=cf.fetch('output_path', './output/model_test'),
                         help='path to the output')
 
     ap.add_argument('--restore_model',

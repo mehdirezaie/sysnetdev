@@ -12,6 +12,8 @@ requires-python = ">=3.7"
 urls = {Repository = "https://github.com/mehdirezaie/sysnetdev"}
 classifiers = ["Programming Language :: Python :: 3"]
 
+[project.scripts]
+sysnet-app = "sysnet.__main__:main"
+
 [tool.setuptools]
 packages = ["sysnet", "sysnet.sources"]
-script-files = ["scripts/sysnet-app"]

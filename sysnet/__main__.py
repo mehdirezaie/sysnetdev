@@ -8,17 +8,24 @@
     Mehdi Rezaie, mr095415@ohio.edu
     October 2020
 """
-def main(debug=False, args=None):
-    import argparse
+def main(debug=False):
+    import sys
     import sysnet
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('config_fn', action='store', type=str, help='Name of configuration file')
-    args = parser.parse_args(args=args)
+    
+    try:
+        yaml_config = sys.argv[1].lower()
+    except IndexError:  # no command
+        print("Pass config file or command line arguments")
+        exit()
+    if yaml_config.startswith('-'):  # not a config file, but an argparse argument
+        yaml_config = None
+    else:
+        sys.argv.pop(1)
 
     if debug:
         sysnet.detect_anomaly() # this will slow down
 
-    config = sysnet.parse_cmd_arguments(args.config_fn)
+    config = sysnet.parse_cmd_arguments(yaml_config=yaml_config)
     pipeline = sysnet.SYSNet(config)
     pipeline.run()
 

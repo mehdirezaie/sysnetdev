@@ -34,7 +34,8 @@ export PYTHONPATH=/Users/rezaie/github/sysnetdev:$PYTHONPATH
 
 Demo
 =====
-For installation and a demo of SYSNet, check out [this demo](https://nbviewer.jupyter.org/github/mehdirezaie/sysnetdev/blob/master/notebooks/demo_decalsdr7.ipynb).
+Detailed: For installation and a demo of SYSNet, check out [this demo](https://nbviewer.jupyter.org/github/mehdirezaie/sysnetdev/blob/master/notebooks/demo_decalsdr7.ipynb).
+Quick: execute `python -m pip install git+https://github.com/mehdirezaie/sysnetdev.git` from your terminal (Thanks to Arnaud De-Mattia).
 
 Build Status
 ============

@@ -20,7 +20,7 @@ class FeatureElimination:
         }
 
     def run(self, axes):
-
+        axes = list(axes)
         # compute with all axes once
         val_loss_baseline = self.train_eval(axes)
         self.logger.info(f"all attributes with {val_loss_baseline:.6f}")

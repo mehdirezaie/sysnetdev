@@ -10,12 +10,13 @@ import sys
 import logging
 
 import numpy as np
-import fitsio as ft
 from time import time
 from glob import glob
 
 import torch
+from math import floor
 from . import sources as src
+from argparse import Namespace
 
 import matplotlib
 matplotlib.use('Agg')
@@ -555,7 +556,79 @@ class SYSNetSnapshot(SYSNet):
             
         return testloss_ensemble, hpix_, torch.cat(pred_ensemble, 1)
 
+class SYSNetMultiProcess(SYSNet):
+    def __init__(self, *arrays, **kwargs):
+        super(SYSNetMultiProcess, self).__init__(*arrays, **kwargs)
+    def train_and_eval_chains(self, dataloaders, nn_structure, partition_id):
+        '''
+        Train and evaluate for 'nchain' times (in parallel!)
 
+        parameters
+        ----------
+        dataloaders : dataloaders,
+            i.e., 'train', 'test', and 'valid'
+        nn_structure : tuple of int
+            i.e., (# units, # hidden layers, # input layer units, # output unit)
+        partition_id : int
+
+        '''
+        np.random.seed(__global_seed__)
+        seeds = np.random.randint(0, __seed_max__, size=self.config.nchains)
+
+        self.collector.start()
+        base_losses = self.get_base_losses(dataloaders)
+        
+        # Using multiprocess
+        nproc = self.config.nchains
+        #resource_count = torch.multiprocessing.cpu_count()
+        #nthreads = floor(resource_count/nproc)
+        #torch.set_num_threads(resource_count)
+        #torch.set_num_interop_threads(nthreads)
+
+        def worker(seed,send_end):
+            #### define the num threads used in current sub-processes
+            # setting the number of threads makes results slightly different,
+            # https://github.com/pytorch/pytorch/issues/88718
+            #torch.set_num_threads(nthreads) 
+            #self.logger.info(f'# running training and evaluation with seed: {seed} (nthreads: {nthreads})')
+            self.logger.info(f'# running training and evaluation with seed: {seed}')
+            train_val_losses = self.train(dataloaders, nn_structure, seed, partition_id)
+            send_end.send(train_val_losses)
+        processes = []
+        pipe_list = []
+        torch.multiprocessing.set_start_method('fork', force=True)
+        for chain_id in range(nproc):
+            seed = seeds[chain_id] + 1000
+            recv_end, send_end = torch.multiprocessing.Pipe(False)
+            process = torch.multiprocessing.Process(target=worker, args=(seed, send_end))
+            processes.append(process)
+            pipe_list.append(recv_end)
+            process.start()
+        for process in processes:
+            process.join()
+        train_val_losses_list = [res.recv() for res in pipe_list]
+
+        for chain_id in range(self.config.nchains):
+
+            seed = seeds[chain_id] + 1000
+
+            if not self.config.no_eval:
+
+                restore_path = self.restore_path_fn(partition_id, seed)
+                test_loss, hpix, pred_ = self.evaluate(dataloaders['test'], nn_structure, restore_path)
+                
+                train_val_losses = train_val_losses_list[chain_id]
+                if isinstance(test_loss, list):                
+                    self.logger.info(f'best val loss: {train_val_losses[0]:.6f}, (mean) test loss: {np.mean(test_loss):.6f}, seed: {seed}')
+                else:
+                    self.logger.info(
+                        f'best val loss: {train_val_losses[0]:.6f}, test loss: {test_loss:.6f}, seed: {seed}')
+                    
+                self.collector.collect_chain(train_val_losses, test_loss, pred_)
+
+        if not self.config.no_eval:
+            self.collector.finish(base_losses, hpix)
+        
 class TrainedModel:
     
     def __init__(self, model, checkpoint, nnstruct=(4, 20), num_features=17):
@@ -573,3 +646,334 @@ class TrainedModel:
         nnw = result[1].numpy().flatten()
         #return Table([hpix, nnw], names=['hpix', 'weight'])
         return (hpix, nnw)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def worker(dataloaders, nn_structure, seed, nthreads, send_end,
+                   Model, Optim, Scheduler, Loss, config,
+                   checkpoint_path, lossfig_path, logger, t0):
+            #### define the num threads used in current sub-processes
+            torch.set_num_interop_threads(nthreads)
+            logger.info(f'# running training and evaluation with seed: {seed} (nthreads: {nthreads})')
+            # "copy" of config
+            config = Namespace(**vars(config))
+            # re-initialize loss, model, optimizer
+            Loss, config.loss_kwargs = src.init_loss(config.loss)
+            Model = src.init_model(config.model)
+            Optim, config.optim_kwargs = src.init_optim(config.optim)
+            Scheduler, config.scheduler_kwargs = src.init_scheduler(config)
+            train_val_losses = src.train_for_multiprocessing(dataloaders, nn_structure, seed,
+                                                             Model, Optim, Scheduler, Loss, config,
+                                                             checkpoint_path, lossfig_path, logger, t0)
+            send_end.send(train_val_losses)
+
+class SYSNetMultiProcess_works(SYSNet):
+    def __init__(self, *arrays, **kwargs):
+        super(SYSNetMultiProcess_works, self).__init__(*arrays, **kwargs)
+
+    def train_and_eval_chains(self, dataloaders, nn_structure, partition_id):
+        '''
+        Train and evaluate for 'nchain' times
+
+        parameters
+        ----------
+        dataloaders : dataloaders,
+            i.e., 'train', 'test', and 'valid'
+        nn_structure : tuple of int
+            i.e., (# units, # hidden layers, # input layer units, # output unit)
+        partition_id : int
+
+        '''
+        np.random.seed(__global_seed__)
+        seeds = np.random.randint(0, __seed_max__, size=self.config.nchains)
+
+        self.collector.start()
+        base_losses = self.get_base_losses(dataloaders)
+        
+        # Using multiprocess
+        nproc = self.config.nchains
+        resource_count = torch.multiprocessing.cpu_count()
+        nthreads = floor(resource_count/nproc)
+        torch.set_num_threads(resource_count)
+        
+
+        processes = []
+        pipe_list = []
+        #torch.multiprocessing.set_start_method('fork', force=True)
+        torch.multiprocessing.set_start_method('spawn', force=True)
+        for chain_id in range(nproc):
+            seed = seeds[chain_id] + 1000
+            recv_end, send_end = torch.multiprocessing.Pipe(False)
+            checkpoint_path = self.checkpoint_path_fn(partition_id, seed)
+            lossfig_path = self.lossfig_path_fn(partition_id, seed)
+            process = torch.multiprocessing.Process(target=worker, 
+                                                    args=(dataloaders, nn_structure, seed, nthreads, send_end,
+                                                          self.Model, self.Optim, self.Scheduler, self.Loss, self.config,
+                                                          checkpoint_path, lossfig_path, self.logger, self.t0))
+            processes.append(process)
+            pipe_list.append(recv_end)
+            process.start()
+        for process in processes:
+            process.join()
+        train_val_losses_list = [res.recv() for res in pipe_list]
+
+        for chain_id in range(self.config.nchains):
+
+            seed = seeds[chain_id] + 1000
+
+            if not self.config.no_eval:
+
+                restore_path = self.restore_path_fn(partition_id, seed)
+                test_loss, hpix, pred_ = self.evaluate(dataloaders['test'], nn_structure, restore_path)
+                
+                #train_val_losses = torch.load(restore_path)['best_val_loss']
+                train_val_losses = train_val_losses_list[chain_id]
+                if isinstance(test_loss, list):                
+                    self.logger.info(f'best val loss: {train_val_losses[0]:.6f}, (mean) test loss: {np.mean(test_loss):.6f}, seed: {seed}')
+                else:
+                    self.logger.info(
+                        f'best val loss: {train_val_losses[0]:.6f}, test loss: {test_loss:.6f}, seed: {seed}')
+                    
+                self.collector.collect_chain(train_val_losses, test_loss, pred_)
+
+        if not self.config.no_eval:
+            self.collector.finish(base_losses, hpix)
+
+
+
+
+
+class SYSNetMultiProcess_old(SYSNet):
+    def __init__(self, *arrays, **kwargs):
+        super(SYSNetMultiProcess_old, self).__init__(*arrays, **kwargs)
+    def train_and_eval_chains(self, dataloaders, nn_structure, partition_id):
+        '''
+        Train and evaluate for 'nchain' times
+
+        parameters
+        ----------
+        dataloaders : dataloaders,
+            i.e., 'train', 'test', and 'valid'
+        nn_structure : tuple of int
+            i.e., (# units, # hidden layers, # input layer units, # output unit)
+        partition_id : int
+
+        '''
+        np.random.seed(__global_seed__)
+        seeds = np.random.randint(0, __seed_max__, size=self.config.nchains)
+
+        self.collector.start()
+        base_losses = self.get_base_losses(dataloaders)
+        
+        # Using multiprocess
+        nproc = self.config.nchains
+        resource_count = torch.multiprocessing.cpu_count()
+        def worker(seed,send_end):
+            #### define the num threads used in current sub-processes
+            nthreads = floor(resource_count/nproc)
+            torch.set_num_threads(nthreads)
+            self.logger.info(f'# running training and evaluation with seed: {seed} (nthreads: {nthreads})')
+            train_val_losses = self.train(dataloaders, nn_structure, seed, partition_id)
+            send_end.send(train_val_losses)
+        processes = []
+        pipe_list = []
+        torch.multiprocessing.set_start_method('fork', force=True)
+        for chain_id in range(nproc):
+            seed = seeds[chain_id] + 1000
+            recv_end, send_end = torch.multiprocessing.Pipe(False)
+            process = torch.multiprocessing.Process(target=worker, args=(seed, send_end))
+            processes.append(process)
+            pipe_list.append(recv_end)
+            process.start()
+        for process in processes:
+            process.join()
+        train_val_losses_list = [res.recv() for res in pipe_list]
+
+        for chain_id in range(self.config.nchains):
+
+            seed = seeds[chain_id] + 1000
+
+            if not self.config.no_eval:
+
+                restore_path = self.restore_path_fn(partition_id, seed)
+                test_loss, hpix, pred_ = self.evaluate(dataloaders['test'], nn_structure, restore_path)
+                
+                #train_val_losses = torch.load(restore_path)['best_val_loss']
+                train_val_losses = train_val_losses_list[chain_id]
+                if isinstance(test_loss, list):                
+                    self.logger.info(f'best val loss: {train_val_losses[0]:.6f}, (mean) test loss: {np.mean(test_loss):.6f}, seed: {seed}')
+                else:
+                    self.logger.info(
+                        f'best val loss: {train_val_losses[0]:.6f}, test loss: {test_loss:.6f}, seed: {seed}')
+                    
+                self.collector.collect_chain(train_val_losses, test_loss, pred_)
+
+        if not self.config.no_eval:
+            self.collector.finish(base_losses, hpix)
+
+class SYSNetMultiProcess_bad(SYSNet):
+    def __init__(self, *arrays, **kwargs):
+        super(SYSNetMultiProcess_bad, self).__init__(*arrays, **kwargs)
+    def train_and_eval_chains(self, dataloaders, nn_structure, partition_id):
+        '''
+        Train and evaluate for 'nchain' times
+
+        parameters
+        ----------
+        dataloaders : dataloaders,
+            i.e., 'train', 'test', and 'valid'
+        nn_structure : tuple of int
+            i.e., (# units, # hidden layers, # input layer units, # output unit)
+        partition_id : int
+
+        '''
+        np.random.seed(__global_seed__)
+        seeds = np.random.randint(0, __seed_max__, size=self.config.nchains)
+
+        self.collector.start()
+        base_losses = self.get_base_losses(dataloaders)
+        
+        # Using multiprocess
+        nproc = self.config.nchains
+        resource_count = torch.multiprocessing.cpu_count()
+        def worker(seed,send_end):
+            #### define the num threads used in current sub-processes
+            nthreads = floor(resource_count/nproc)
+            torch.set_num_threads(nthreads)
+            self.logger.info(f'# running training and evaluation with seed: {seed} (nthreads: {nthreads})')
+            train_val_losses = self.train(dataloaders, nn_structure, seed, partition_id)
+            send_end.send(train_val_losses)
+        processes = []
+        pipe_list = []
+        torch.multiprocessing.set_start_method('fork', force=True)
+        for chain_id in range(nproc):
+            seed = seeds[chain_id] + 1000
+            recv_end, send_end = torch.multiprocessing.Pipe(False)
+            process = torch.multiprocessing.Process(target=worker, args=(seed, send_end))
+            processes.append(process)
+            pipe_list.append(recv_end)
+            process.start()
+        for process in processes:
+            process.join()
+        train_val_losses_list = [res.recv() for res in pipe_list]
+
+        for chain_id in range(self.config.nchains):
+
+            seed = seeds[chain_id] + 1000
+
+            if not self.config.no_eval:
+
+                restore_path = self.restore_path_fn(partition_id, seed)
+                test_loss, hpix, pred_ = self.evaluate(dataloaders['test'], nn_structure, restore_path)
+                
+                #train_val_losses = torch.load(restore_path)['best_val_loss']
+                train_val_losses = train_val_losses_list[chain_id]
+                if isinstance(test_loss, list):                
+                    self.logger.info(f'best val loss: {train_val_losses[0]:.6f}, (mean) test loss: {np.mean(test_loss):.6f}, seed: {seed}')
+                else:
+                    self.logger.info(
+                        f'best val loss: {train_val_losses[0]:.6f}, test loss: {test_loss:.6f}, seed: {seed}')
+                    
+                self.collector.collect_chain(train_val_losses, test_loss, pred_)
+
+        if not self.config.no_eval:
+            self.collector.finish(base_losses, hpix)
+
+    def train(self, dataloaders, nn_structure, seed, partition_id):
+        """
+        Train and evaluate a nn on training and validation sets
+
+
+        parameters
+        ----------
+        dataloaders :
+        nn_structure : (tuple of int)
+        seed : (int)
+        partition_id : (int)
+
+        returns
+        -------
+        losses : (float, list of float, list of float)
+            best validation loss
+            training losses
+            validation losses
+        """
+        checkpoint_path = self.checkpoint_path_fn(partition_id, seed)
+        lossfig_path = self.lossfig_path_fn(partition_id, seed)
+
+        model = self.Model(*nn_structure, seed=seed)
+        optim_kwargs = dict(lr=self.config.learning_rate, **self.config.optim_kwargs)
+        optimizer = self.Optim(params=model.parameters(), **optim_kwargs)
+        scheduler = self.Scheduler(optimizer, **self.config.scheduler_kwargs) if self.Scheduler is not None else None
+        loss_fn = self.Loss(**self.config.loss_kwargs)
+        params = dict(nepochs=self.config.nepochs, device=self.config.device,
+                      verbose=True, l1_alpha=self.config.l1_alpha)
+
+        losses = src.train_and_eval(model, optimizer, loss_fn, dataloaders, params,
+                                    checkpoint_path=checkpoint_path, scheduler=scheduler,
+                                    restore_model=self.config.restore_model, return_losses=True,
+                                    snapshot_ensemble=self.config.snapshot_ensemble)
+        self.plot_losses(losses, lossfig_path)
+        self.logger.info(f'finished training in {time()-self.t0:.3f} sec, checkout {lossfig_path}')
+        return losses
+    
+    def train_bad(self, dataloaders, nn_structure, seed, partition_id):
+        """
+        Train and evaluate a nn on training and validation sets
+
+
+        parameters
+        ----------
+        dataloaders :
+        nn_structure : (tuple of int)
+        seed : (int)
+        partition_id : (int)
+
+        returns
+        -------
+        losses : (float, list of float, list of float)
+            best validation loss
+            training losses
+            validation losses
+        """
+        print("Using training-mp")
+        checkpoint_path = self.checkpoint_path_fn(partition_id, seed)
+        lossfig_path = self.lossfig_path_fn(partition_id, seed)
+
+        # re-initialize model and optimizer
+        model = src.init_model(self.config.model)(*nn_structure, seed=seed)
+        model.load_state_dict(self.Model(*nn_structure, seed=seed).state_dict())
+        Optim, optim_kwargs = src.init_optim(self.config.optim)
+        optim_kwargs = dict(lr=self.config.learning_rate, **optim_kwargs)
+        optimizer = Optim(params=model.parameters(),**optim_kwargs)
+        optimizer.load_state_dict(self.Optim(params=model.parameters(), **optim_kwargs).state_dict())
+
+        scheduler = self.Scheduler(optimizer, **self.config.scheduler_kwargs) if self.Scheduler is not None else None
+        loss_fn = self.Loss(**self.config.loss_kwargs)
+        params = dict(nepochs=self.config.nepochs, device=self.config.device,
+                      verbose=True, l1_alpha=self.config.l1_alpha)
+
+        losses = src.train_and_eval(model, optimizer, loss_fn, dataloaders, params,
+                                    checkpoint_path=checkpoint_path, scheduler=scheduler,
+                                    restore_model=self.config.restore_model, return_losses=True,
+                                    snapshot_ensemble=self.config.snapshot_ensemble)
+        self.plot_losses(losses, lossfig_path)
+        self.logger.info(f'finished training in {time()-self.t0:.3f} sec, checkout {lossfig_path}')
+        return losses

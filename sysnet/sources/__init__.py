@@ -5,6 +5,7 @@ from .models import init_model, LinearRegression
 from .train import (tune_model_structure, train_and_eval,
                     evaluate, tune_l1_scale, compute_baseline_losses,
                    init_optim, init_scheduler, get_device, forward)
+from .trainmp import (train_for_multiprocessing)
 from .feature_elimination import FeatureElimination
 from .utils import set_logger
 from .losses import init_loss

@@ -189,7 +189,7 @@ def forward(model, dataloader, params):
 
 def train_and_eval(model, optimizer, loss_fn, dataloaders, params,
                    checkpoint_path=None, scheduler=None, restore_model=None, return_losses=False,
-                   snapshot_ensemble=False):
+                   snapshot_ensemble=False, return_msg=False):
     """
     Train and evaluate a deep learning model every epoch
     """
@@ -223,7 +223,7 @@ def train_and_eval(model, optimizer, loss_fn, dataloaders, params,
             scheduler_state = None
 
     # early_stopping = EarlyStopping(patience=10, verbose=True) # callbacks
-
+    msg_all = [] # AJRM: collect all messages. used if return_msg=True
     for epoch in range(epoch_first, epoch_last):  # training loop for `nepochs`
         msg = f"Epoch {epoch}/{epoch_last-1} "
 
@@ -265,7 +265,12 @@ def train_and_eval(model, optimizer, loss_fn, dataloaders, params,
                     scheduler_state = None                
 
         if params['verbose']:
-            logging.info(msg)
+            if not return_msg: 
+                # AJRM: If return_msg is true we do not want mulitple processes 
+                # trying to write msg to the same file.
+                logging.info(msg)
+            else: 
+                msg_all.append(msg)
         # Early stopping
         # early_stopping(valid_loss)
         # if early_stopping.early_stop:
@@ -285,8 +290,12 @@ def train_and_eval(model, optimizer, loss_fn, dataloaders, params,
     ret = (best_val_loss, )
     if return_losses:
         ret += (train_losses, valid_losses)
-
-    return ret
+    
+    if return_msg: 
+        # AJRM: This statement is added to return msg for each epoch
+        return ret, msg_all
+    else:
+        return ret
 
 
 def l1_loss(model):

@@ -18,9 +18,10 @@ from math import floor
 from . import sources as src
 from argparse import Namespace
 
+from mpi4py import MPI
+
 import matplotlib
 matplotlib.use('Agg')
-
 
 # set some global variables which do not change
 __logger_level__ = 'info'  # info, debug, or warning
@@ -556,9 +557,197 @@ class SYSNetSnapshot(SYSNet):
             
         return testloss_ensemble, hpix_, torch.cat(pred_ensemble, 1)
 
-class SYSNetMultiProcess(SYSNet):
+def worker(dataloaders, nn_structure, seed, send_end,
+           config, checkpoint_path, lossfig_path, t0):
+    # setting the number of threads makes results slightly different,
+    # https://github.com/pytorch/pytorch/issues/88718
+    #torch.set_num_threads(nthreads)
+    # re-initialize loss, model, optimizer for each chain
+    Loss, config.loss_kwargs = src.init_loss(config.loss)
+    Model = src.init_model(config.model)
+    Optim, config.optim_kwargs = src.init_optim(config.optim)
+    Scheduler, config.scheduler_kwargs = src.init_scheduler(config)
+    train_val_losses = src.train_for_multiprocessing(dataloaders, nn_structure, seed,
+                                                     Model, Optim, Scheduler, Loss, config,
+                                                     checkpoint_path, lossfig_path, t0)
+    send_end.send(train_val_losses)
+    
+class SYSNetMPI(SYSNet):
+    """
+    SYSNetMPI: An MPI-enabled version of SYSNet to parallelize training across partitions.
+    Furthermore, use multiprocesses to parallelize training across chains within partitions.
+    TODO: Need to fix logging behavior. Right now only rank 0 displays and logs information,
+    otherwise all ranks will compete for writing to the log file.
+    """
+    logger = logging.getLogger()
+    
+    def __init__(self, config):
+        self.mpicomm = MPI.COMM_WORLD
+        self.rank = self.mpicomm.Get_rank()
+        self.size = self.mpicomm.Get_size()
+        self.mpiroot = 0
+        
+        self.t0 = time()
+        self.config = config
+
+        log_path = os.path.join(self.config.output_path, 'train.log')
+        if self.rank == self.mpiroot:
+            src.set_logger(log_path, level=__logger_level__)
+            self.logger.info(f"logging in {log_path}")
+
+        # initialize loss, collectors, model, optimizor
+        self.Loss, self.config.loss_kwargs = src.init_loss(self.config.loss)
+        self.collector = src.SYSNetCollector()
+        self.Model = src.init_model(self.config.model)
+        self.Optim, self.config.optim_kwargs = src.init_optim(self.config.optim)
+        self.Scheduler, self.config.scheduler_kwargs = src.init_scheduler(self.config)
+        
+        
+        self.config.device = src.get_device() # set the device
+        if self.rank == self.mpiroot:
+            self.logger.info('# --- inputs params ---')
+            for (key, value) in self.config.__dict__.items():
+                self.logger.info(f'{key}: {value}')
+            self.logger.info(f"pipeline initialized in {time()-self.t0:.3f} s")
+
+            self.ld = src.MyDataLoader(self.config.input_path,
+                                       do_kfold=self.config.do_kfold,
+                                       seed=__global_seed__)
+        self.ld = self.mpicomm.bcast(getattr(self, 'ld', None), root=self.mpiroot)
+        
+        if self.config.axes == ['all']:
+            if self.config.do_kfold:
+                num_features = self.ld.df_split[0][0]['features'].shape[1]
+            else:
+                num_features = self.ld.df_split[0]['features'].shape[1]
+            self.config.axes = np.arange(num_features)
+        else:
+            self.config.axes = [int(i) for i in self.config.axes]
+        if self.rank == self.mpiroot:
+            self.logger.info(f'updated axes to {self.config.axes}')
+            self.logger.info(f'data loaded in {time()-self.t0:.3f} sec')
+
+        # ---- set the paths
+        self.weights_path = os.path.join(
+            self.config.output_path, 'nn-weights.fits') # NN output, prediction, used as 'weight' for cosmology
+        self.metrics_path = os.path.join(
+            self.config.output_path, 'metrics.npz')     # traing and val losses, mean & std of featuers, ..
+        self.checkpoint_path_fn = lambda pid, sd: os.path.join(
+            self.config.output_path, f'model_{pid}_{sd}')
+        self.restore_path_fn = lambda pid, sd: os.path.join(
+            self.checkpoint_path_fn(pid, sd), f'best.pth.tar')
+        self.lossfig_path_fn = lambda pid, sd: os.path.join(
+            self.checkpoint_path_fn(pid, sd), f'loss_model_{pid}_{sd}.png')
+        self.lrfig_path_fn = lambda pid: os.path.join(
+            self.config.output_path, f'loss_vs_lr_{pid}.png')
+            
+    def run(self):
+        """
+        Run SYSNet with partition-level parallelization using MPI.
+        Each rank handles one partition.
+        """
+        if self.config.do_rfe:
+            if self.rank == self.mpiroot:
+                self.axes_from_rfe = self.run_rfe(self.config.axes)
+            self.axes_from_rfe = self.mpicomm.bcast(getattr(self, 'axes_from_rfe', None), root=self.mpiroot)
+            sys.exit('rfe done...rerun the code without --do_rfe')
+
+        self.logger.info(f'# [Rank {self.rank}] Starting partition-level MPI pipeline')
+
+        num_partitions = 5 if self.config.do_kfold else 1
+
+        if self.size > num_partitions:
+            if self.rank == self.mpiroot:
+                self.logger.warning(f'More MPI ranks ({self.size}) than partitions ({num_partitions}). Some ranks will idle.')
+
+        if self.rank < num_partitions:
+            # Each rank handles one partition
+            partition_id = self.rank
+            axes = self.axes_for_partition(partition_id)
+            nn_structure = self.get_structure(len(axes))
+
+            if self.rank == self.mpiroot:
+                self.logger.info(f'[Rank {self.rank}] Processing partition {partition_id} with structure {nn_structure}')
+
+            dataloaders = self.ld.load_data(batch_size=self.config.batch_size,
+                                            partition_id=partition_id,
+                                            normalization=self.config.normalization,
+                                            axes=axes)
+
+            self.tune_hyperparams(dataloaders, nn_structure, partition_id)
+            self.train_and_eval_chains(dataloaders, nn_structure, partition_id)
+
+        self.mpicomm.Barrier()
+        self.collectors = self.mpicomm.gather(self.collector, root=self.mpiroot)
+        
+        if not self.config.no_eval and self.rank == self.mpiroot:
+            self.logger.info(f'finished training in {time()-self.t0:.3f} sec')
+            self.logger.info(f'wrote weights: {self.weights_path}')
+            self.logger.info(f'wrote weights: {self.weights_path}')
+            self.collector.save_collectors(self.collectors, self.weights_path, self.metrics_path)
+            if self.config.do_tar:
+                self.tar_models(self.config.output_path)
+    
+    def train_and_eval_chains(self, dataloaders, nn_structure, partition_id):
+        '''
+        Train and evaluate for 'nchain' times (using multiprocessing)
+        '''
+        np.random.seed(__global_seed__)
+        seeds = np.random.randint(0, __seed_max__, size=self.config.nchains)
+
+        self.collector.start()
+        base_losses = self.get_base_losses(dataloaders)
+        
+        # Using multiprocess
+        nproc = self.config.nchains
+        #resource_count = torch.multiprocessing.cpu_count() - 1
+        #nthreads = floor(resource_count/nproc)
+        #torch.set_num_threads(resource_count)
+
+        processes = []
+        pipe_list = []
+        torch.multiprocessing.set_start_method('spawn', force=True)
+        for chain_id in range(nproc):
+            seed = seeds[chain_id] + 1000
+            recv_end, send_end = torch.multiprocessing.Pipe(False)
+            checkpoint_path = self.checkpoint_path_fn(partition_id, seed)
+            lossfig_path = self.lossfig_path_fn(partition_id, seed)
+            process = torch.multiprocessing.Process(target=worker, 
+                                                    args=(dataloaders, nn_structure, seed, send_end,
+                                                          self.config, checkpoint_path, lossfig_path, self.t0))
+            processes.append(process)
+            pipe_list.append(recv_end)
+            process.start()
+        for process in processes:
+            process.join()
+        train_val_losses_list = [res.recv() for res in pipe_list]
+        self.logger.info(f'[Rank {self.rank}] finished training all models that follow pattern model_{partition_id}_* in {time()-self.t0:.3f} sec')
+        
+        for chain_id in range(self.config.nchains):
+
+            seed = seeds[chain_id] + 1000
+
+            if not self.config.no_eval:
+
+                restore_path = self.restore_path_fn(partition_id, seed)
+                test_loss, hpix, pred_ = self.evaluate(dataloaders['test'], nn_structure, restore_path)
+                
+                #train_val_losses = torch.load(restore_path)['best_val_loss']
+                train_val_losses = train_val_losses_list[chain_id]
+                
+                if isinstance(test_loss, list):                
+                    self.logger.info(f'[Rank {self.rank}] best val loss: {train_val_losses[0]:.6f}, (mean) test loss: {np.mean(test_loss):.6f}, seed: {seed}')
+                else:
+                    self.logger.info(f'[Rank {self.rank}] best val loss: {train_val_losses[0]:.6f}, test loss: {test_loss:.6f}, seed: {seed}')
+                    
+                self.collector.collect_chain(train_val_losses, test_loss, pred_)
+
+        if not self.config.no_eval:
+            self.collector.finish(base_losses, hpix)
+
+class SYSNetMultiProcess_hangs(SYSNet):
     def __init__(self, *arrays, **kwargs):
-        super(SYSNetMultiProcess, self).__init__(*arrays, **kwargs)
+        super(SYSNetMultiProcess_hangs, self).__init__(*arrays, **kwargs)
     def train_and_eval_chains(self, dataloaders, nn_structure, partition_id):
         '''
         Train and evaluate for 'nchain' times (in parallel!)
@@ -596,7 +785,7 @@ class SYSNetMultiProcess(SYSNet):
             send_end.send(train_val_losses)
         processes = []
         pipe_list = []
-        torch.multiprocessing.set_start_method('fork', force=True)
+        torch.multiprocessing.set_start_method('spawn', force=True)
         for chain_id in range(nproc):
             seed = seeds[chain_id] + 1000
             recv_end, send_end = torch.multiprocessing.Pipe(False)
@@ -648,33 +837,17 @@ class TrainedModel:
         return (hpix, nnw)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def worker(dataloaders, nn_structure, seed, nthreads, send_end,
+def worker_old(dataloaders, nn_structure, seed, nthreads, send_end,
                    Model, Optim, Scheduler, Loss, config,
                    checkpoint_path, lossfig_path, logger, t0):
-            #### define the num threads used in current sub-processes
-            torch.set_num_interop_threads(nthreads)
-            logger.info(f'# running training and evaluation with seed: {seed} (nthreads: {nthreads})')
+            # setting the number of threads makes results slightly different,
+            # https://github.com/pytorch/pytorch/issues/88718
+            #torch.set_num_threads(nthreads)
+            #logger.info(f'# running training and evaluation with seed: {seed} (nthreads: {nthreads})')
+            #print(f'# running training and evaluation with seed: {seed} (nthreads: {nthreads})')
             # "copy" of config
-            config = Namespace(**vars(config))
-            # re-initialize loss, model, optimizer
+            #config = Namespace(**vars(config))
+            # re-initialize loss, model, optimizer for each chain
             Loss, config.loss_kwargs = src.init_loss(config.loss)
             Model = src.init_model(config.model)
             Optim, config.optim_kwargs = src.init_optim(config.optim)
@@ -683,10 +856,25 @@ def worker(dataloaders, nn_structure, seed, nthreads, send_end,
                                                              Model, Optim, Scheduler, Loss, config,
                                                              checkpoint_path, lossfig_path, logger, t0)
             send_end.send(train_val_losses)
+    
+def worker_(dataloaders, nn_structure, seed, nthreads, send_end,
+           config, checkpoint_path, lossfig_path, t0):
+    # setting the number of threads makes results slightly different,
+    # https://github.com/pytorch/pytorch/issues/88718
+    #torch.set_num_threads(nthreads)
+    # re-initialize loss, model, optimizer for each chain
+    Loss, config.loss_kwargs = src.init_loss(config.loss)
+    Model = src.init_model(config.model)
+    Optim, config.optim_kwargs = src.init_optim(config.optim)
+    Scheduler, config.scheduler_kwargs = src.init_scheduler(config)
+    train_val_losses, msg = src.train_for_multiprocessing(dataloaders, nn_structure, seed,
+                                                          Model, Optim, Scheduler, Loss, config,
+                                                          checkpoint_path, lossfig_path, t0)
+    send_end.send(train_val_losses)
 
-class SYSNetMultiProcess_works(SYSNet):
+class SYSNetMultiProcess(SYSNet):
     def __init__(self, *arrays, **kwargs):
-        super(SYSNetMultiProcess_works, self).__init__(*arrays, **kwargs)
+        super(SYSNetMultiProcess, self).__init__(*arrays, **kwargs)
 
     def train_and_eval_chains(self, dataloaders, nn_structure, partition_id):
         '''
@@ -709,9 +897,9 @@ class SYSNetMultiProcess_works(SYSNet):
         
         # Using multiprocess
         nproc = self.config.nchains
-        resource_count = torch.multiprocessing.cpu_count()
+        resource_count = torch.multiprocessing.cpu_count() - 1
         nthreads = floor(resource_count/nproc)
-        torch.set_num_threads(resource_count)
+        #torch.set_num_threads(resource_count)
         
 
         processes = []
@@ -725,15 +913,18 @@ class SYSNetMultiProcess_works(SYSNet):
             lossfig_path = self.lossfig_path_fn(partition_id, seed)
             process = torch.multiprocessing.Process(target=worker, 
                                                     args=(dataloaders, nn_structure, seed, nthreads, send_end,
-                                                          self.Model, self.Optim, self.Scheduler, self.Loss, self.config,
-                                                          checkpoint_path, lossfig_path, self.logger, self.t0))
+                                                          self.config, checkpoint_path, lossfig_path, self.t0))
             processes.append(process)
             pipe_list.append(recv_end)
             process.start()
         for process in processes:
             process.join()
         train_val_losses_list = [res.recv() for res in pipe_list]
-
+        #print(train_val_losses_list)
+        #for msgi in [res.recv() for res in pipe_list]:
+        #    self.logger.info(msgi[1])
+        self.logger.info(f'finished training all models that follow pattern model_{partition_id}_* in {time()-self.t0:.3f} sec')
+        
         for chain_id in range(self.config.nchains):
 
             seed = seeds[chain_id] + 1000
@@ -755,9 +946,6 @@ class SYSNetMultiProcess_works(SYSNet):
 
         if not self.config.no_eval:
             self.collector.finish(base_losses, hpix)
-
-
-
 
 
 class SYSNetMultiProcess_old(SYSNet):

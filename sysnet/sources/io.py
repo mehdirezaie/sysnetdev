@@ -188,6 +188,29 @@ class SYSNetCollector:
         # hpmap = tohp(nside, self.hpix, self.pred)
         # hp.write_map(output_path.replace('.json', f'.hp{nside}.fits'), hpmap,
         #             overwrite=True, dtype=hpmap.dtype)
+    
+    def save_collectors(self, collectors, weights_path, metrics_path, nside=None):
+        """ save metrics and predictions given list of collectors """
+        weights_dir = os.path.dirname(weights_path)
+        if not os.path.exists(weights_dir):
+            os.makedirs(weights_dir)
+
+        metrics_dir = os.path.dirname(metrics_path)
+        if not os.path.exists(metrics_dir):
+            os.makedirs(metrics_dir)
+        
+        pred = [collector.pred[0] for collector in collectors]
+        hpix = [collector.hpix[0] for collector in collectors]
+        pred = torch.cat(pred, 0).cpu().numpy()
+        hpix = torch.cat(hpix, 0).numpy()
+        weights = np.zeros(pred.shape[0], dtype=[
+                           ('hpix', 'i8'), ('weight', 'f8', (pred.shape[1], ))])
+        weights['hpix'] = hpix
+        weights['weight'] = pred
+
+        ft.write(weights_path, weights, clobber=True)
+        np.savez(metrics_path, base_losses=self.base_losses, losses=self.losses)
+    
 
 
 class NumpyArrayEncoder(JSONEncoder):

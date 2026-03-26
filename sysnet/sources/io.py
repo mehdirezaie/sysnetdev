@@ -328,12 +328,17 @@ class MyDataLoader:
             datasets['stats'] = stats
             return datasets#, stats
         else:
+            # Drop the last batch if it has only a single data point. This is an ugly fix.
+            # The check happens for the training fold, we assume its 60% of the data.
+            if int(self.df.size)%batch_size == 1: 
+                self.logger.info(f'Dropping last batch because {int(self.df.size)}%{batch_size} = {int(self.df.size)%batch_size}.')
+                drop_last = True
             shuffle_kw = dict(train=True, valid=True, test=False)
             dataloaders = {
                 s: DataLoader(datasets[s],
                               batch_size=batch_size,
                               shuffle=shuffle_kw[s],
-                              drop_last=False, #https://discuss.pytorch.org/t/error-expected-more-than-1-value-per-channel-when-training/26274/4
+                              drop_last=drop_last, #https://discuss.pytorch.org/t/error-expected-more-than-1-value-per-channel-when-training/26274/4
                               num_workers=0) # it was 0
                 for s in ['train', 'valid', 'test']
             }

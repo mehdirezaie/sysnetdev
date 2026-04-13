@@ -333,7 +333,7 @@ class MyDataLoader:
             drop_last = False
             if int(train.y.size)%batch_size == 1: 
                 self.logger.info(f'Dropping last batch because {int(train.y.size)}%{batch_size} = {int(train.y.size)%batch_size}.')
-                drop_last = False
+                drop_last = True
             shuffle_kw = dict(train=True, valid=True, test=False)
             dataloaders = {
                 s: DataLoader(datasets[s],

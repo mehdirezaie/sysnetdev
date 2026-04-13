@@ -328,12 +328,12 @@ class MyDataLoader:
             datasets['stats'] = stats
             return datasets#, stats
         else:
-            # Drop the last batch if it has only a single data point. This is an ugly fix.
-            # The check happens for the training fold, we assume its 60% of the data.
+            # Drop the last batch if it has only a single data point in the training fold. 
+            # This is an ugly fix. It might be better to just change the choice of batch size.
             drop_last = False
-            if int(self.df.size*0.6)%batch_size == 1: 
-                self.logger.info(f'Dropping last batch because {int(self.df.size*0.6)}%{batch_size} = {int(self.df.size*0.6)%batch_size}.')
-                drop_last = True
+            if int(train.y.size)%batch_size == 1: 
+                self.logger.info(f'Dropping last batch because {int(train.y.size)}%{batch_size} = {int(train.y.size)%batch_size}.')
+                drop_last = False
             shuffle_kw = dict(train=True, valid=True, test=False)
             dataloaders = {
                 s: DataLoader(datasets[s],
